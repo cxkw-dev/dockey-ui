@@ -1,6 +1,6 @@
 # Verification record
 
-Local validation on October 28, 2026, for the native alpha through 0.1.5 branding, window lifecycle, and Dock visibility. The first published alpha was 0.1.1; the unpublished 0.1.0 tag failed hosted Intel GUI validation.
+Local validation on October 28, 2026, for the native alpha. Earlier checks below cover the existing functionality; the Rounded 01 wordmark update for 0.1.6 has pending visual checks. The first published alpha was 0.1.1; the unpublished 0.1.0 tag failed hosted Intel GUI validation.
 
 ## Environment
 
@@ -33,7 +33,7 @@ The release app was opened from the per-user Applications directory and connecte
 
 Demo-mode UI checks verified individual lifecycle controls, stop confirmation, search, details, Settings, and appearance changes. [Dark](screenshots/dockey-dark.png) and [light](screenshots/dockey-light.png) screenshots were exported from the native release app using synthetic demo resources. They are interface evidence, not live-engine screenshots.
 
-The 0.1.5 native exports show the script wordmark and teal mascot outline in both themes. Installed-app UI checks also verified the sidebar and larger About artwork. The small sidebar outline remains visible, and the wordmark fits beside it without clipping. The wordmark uses compiled vector paths; its source font and license are pinned in the repository and the font is not bundled into the runtime app.
+For **0.1.6 Rounded 01**, the vector lettering was compared with the approved crop, and both native demo themes were reviewed for faithful shapes, centering, clipping, and small-size legibility. The installed app connected to the existing engine; About was checked in light and dark appearance and exposed an accessible Dockey image label. The original System appearance preference was restored. Sidebar proportions are mascot 32 / lettering 26 / gap 3 points; About uses 70 / 56 / 6 with its version separately below. All 75 Swift tests, installation/archive checks, and full native checks for both resource-bundle layouts passed. Tracing and vector export regenerated identical outputs. The app uses the compiled Shape; reference images and tracing tools are not bundled.
 
 The modern state selector was checked with keyboard selection, and the custom checkbox exposed a native checked/unchecked accessibility value while updating the filtered list. Settings were checked in both appearances. The obsolete polling-interval setting was removed; [live updates](performance.md) describes the event stream, visible metrics, cache behavior, and measured CLI bottleneck.
 

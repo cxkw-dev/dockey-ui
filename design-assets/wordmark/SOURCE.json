@@ -1,25 +1,27 @@
 {
-  "family": "Leckerli One",
-  "style": "Regular",
-  "repository": "https://github.com/google/fonts",
-  "revision": "9862abc066c9b83bf84c3e8ed1fc2d8d48f9bbf0",
-  "license": "SIL Open Font License 1.1",
-  "usage": "Dockey lettering shaped with CoreText and exported as static vector outlines, with an additional 0.12 forward shear. The source font is not an app runtime dependency.",
-  "files": [
-    {
-      "file": "LeckerliOne-Regular.ttf",
-      "url": "https://raw.githubusercontent.com/google/fonts/9862abc066c9b83bf84c3e8ed1fc2d8d48f9bbf0/ofl/leckerlione/LeckerliOne-Regular.ttf",
-      "sha256": "3f38ed99a07ab426eaa64c7d5773850a5dc8e6719b03125efce2cfbc82b083d7"
-    },
-    {
-      "file": "OFL.txt",
-      "url": "https://raw.githubusercontent.com/google/fonts/9862abc066c9b83bf84c3e8ed1fc2d8d48f9bbf0/ofl/leckerlione/OFL.txt",
-      "sha256": "2937c7789b0e4fdeda6eafe93164a2ab36e20386704c4cb6f87b1deb620ec0da"
-    },
-    {
-      "file": "FONTLOG.txt",
-      "url": "https://raw.githubusercontent.com/google/fonts/9862abc066c9b83bf84c3e8ed1fc2d8d48f9bbf0/ofl/leckerlione/FONTLOG.txt",
-      "sha256": "a0cc79f7c5e1aeb280e2d414f8a8eb2aa8fa86e3ac535836a21448c55085e6d7"
-    }
-  ]
+  "design": "Rounded 01",
+  "selection": "Owner-selected wordmark from the ten-concept comparison board",
+  "reference": {
+    "file": "rounded-reference.png",
+    "sha256": "ae839ec47cc59892a6ef76fb5ce814c4ba24f5ea76e9eeaf43ccd705260c482f"
+  },
+  "outline": {
+    "file": "rounded-outline.svg",
+    "sha256": "5d801e9952cf5a24335a7c79ab95b2d905ea7eb4648fd1cc083c446bdb1c6725"
+  },
+  "vectorization": {
+    "tool": "vtracer",
+    "version": "0.6.12",
+    "threshold": 128,
+    "colormode": "binary",
+    "mode": "spline",
+    "filter_speckle": 4,
+    "corner_threshold": 60,
+    "length_threshold": 3.5,
+    "max_iterations": 10,
+    "splice_threshold": 45,
+    "path_precision": 3
+  },
+  "runtime": "Cached native SwiftUI paths; no source image, script font, or tracing tools bundled",
+  "license": "Project artwork under Apache-2.0"
 }

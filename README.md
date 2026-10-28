@@ -1,4 +1,9 @@
-<p align="center"><img src="design-assets/dockey-mark.svg" width="88" height="88" alt="Dockey mascot"></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dockey-brand-dark.png">
+    <img src="docs/screenshots/dockey-brand-light.png" width="230" alt="Dockey rounded wordmark with its teal-outlined mascot">
+  </picture>
+</p>
 
 # Dockey
 
@@ -103,6 +108,8 @@ open dist/Dockey.app --args --demo
 `check-app-launch.sh` exercises temporary app copies with both flat SwiftPM and wrapped SwiftBuild resource bundles. Its default check rejects a missing font or service mark, verifies intact fonts, marks, and licenses, and exports a readable native demo PNG within a bounded timeout. Apple Silicon CI runs this full check. Intel CI explicitly uses `--resources-only`: both layouts must pass startup/resource verification and missing-font/mark rejection, but GUI rendering is not tested. The Intel hosted runner aborts during Metal rendering; physical Intel visual compatibility remains unverified. There is no automatic fallback, and neither mode connects to Docker. See [verification limits](docs/verification.md#compatibility-limits).
 
 [Refresh performance and measured bottlenecks →](docs/performance.md)
+
+The **Rounded 01** wordmark is editable project artwork, rendered as cached native vectors. The [branding guide](docs/branding.md) covers its source reference, SVG outline, and offline regeneration tools. No additional wordmark font or image is loaded by the app.
 
 For an opt-in live integration check against your existing local engine:
 

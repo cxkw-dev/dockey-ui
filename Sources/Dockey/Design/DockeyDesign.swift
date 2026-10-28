@@ -110,7 +110,7 @@ extension Color {
 }
 
 struct DockeyWordmark: View {
-    var size: CGFloat = 28
+    var size: CGFloat = 26
     var body: some View {
         DockeyWordmarkShape()
             .fill()
@@ -123,14 +123,20 @@ struct DockeyWordmark: View {
 
 struct DockeyBrandLockup: View {
     var mascotSize: CGFloat = 32
-    var wordmarkSize: CGFloat = 28
-    var spacing: CGFloat = 8
+    var wordmarkSize: CGFloat = 26
+    var spacing: CGFloat = 3
+
+    private enum OpticalCenter: AlignmentID {
+        static func defaultValue(in dimensions: ViewDimensions) -> CGFloat { dimensions[VerticalAlignment.center] }
+    }
+    private static let opticalCenter = VerticalAlignment(OpticalCenter.self)
 
     var body: some View {
-        HStack(spacing: spacing) {
+        HStack(alignment: Self.opticalCenter, spacing: spacing) {
             DockeyMascot().frame(width: mascotSize, height: mascotSize)
-            // Center the main lettering optically; the script descender extends below it.
-            DockeyWordmark(size: wordmarkSize).offset(y: wordmarkSize * 3 / 28)
+                .alignmentGuide(Self.opticalCenter) { $0.height * 0.53 }
+            DockeyWordmark(size: wordmarkSize)
+                .alignmentGuide(Self.opticalCenter) { $0.height * DockeyWordmarkShape.opticalCenterRatio }
         }
     }
 }

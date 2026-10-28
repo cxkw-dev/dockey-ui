@@ -4,11 +4,21 @@ Product name: **Dockey**. Selected layout: **A — Grouped list**.
 
 ## Wordmark
 
-The wordmark uses bold, connected script lettering inspired by the supplied reference, flattened to a single foreground color. It is light on dark surfaces and charcoal on light surfaces. There is no surrounding badge, extrusion, texture, or shadow. The teal-outlined mascot remains the color accent.
+The wordmark follows **Rounded 01**, the selected concept-board lettering. Preserve its rounded letterforms and proportions when editing the outline. It uses a single foreground color: light on dark surfaces and charcoal on light surfaces. The teal-outlined mascot provides the color accent.
 
-The lettering is shaped from **Leckerli One**, with a slight additional forward lean, and exported to static native paths and a portable [SVG](../design-assets/dockey-wordmark.svg). Rounded brush strokes give it a softer, heavier silhouette. Pinned source, hashes, and licensing are recorded in [wordmark/SOURCE.json](../design-assets/wordmark/SOURCE.json). The upstream font and notices live under `design-assets/wordmark/vendor/`; the app bundles the notices but does not load or ship the script font at runtime.
+This is project artwork traced from the approved [cropped PNG reference](../design-assets/wordmark/rounded-reference.png). The [editable outline](../design-assets/wordmark/rounded-outline.svg), portable [SVG](../design-assets/dockey-wordmark.svg), and cached native Shape share the selected lettering. [SOURCE.json](../design-assets/wordmark/SOURCE.json) records provenance, hashes, and the offline conversion. No script or serif font is used for the wordmark.
 
-Regenerate both vector representations offline on macOS using `swift scripts/generate-wordmark.swift`. The generator checks the source font's pinned SHA-256 before exporting. A shared brand component keeps the mascot and wordmark aligned: the sidebar lettering is 28 points high with a 3-point optical downward adjustment, and About scales this to 42 points. The version label sits below the About component so it cannot displace the lettering relative to the mascot. The native path is cached; rendering performs no font shaping, file reads, or image decoding.
+Regenerate the outline and native exports offline on macOS:
+
+```sh
+uv run scripts/trace-wordmark.py
+swift scripts/generate-wordmark.swift
+./scripts/build-app.sh
+```
+
+Pillow and vtracer are pinned development-only tools in the tracing script's metadata. The Swift exporter checks the outline against `SOURCE.json`, writes portable SVG and a cached native Shape, and computes the filled-area optical center offline. Update the recorded outline hash after an intentional manual SVG edit. The app renders the compiled vectors without image/font loading, tracing, or optical-center sampling at runtime.
+
+One shared component aligns the lettering's filled-area center with the mascot. Proportions are mascot 32 / lettering 26 / gap 3 points in the sidebar, and 70 / 56 / 6 in About. The version sits separately below About's brand component. Both themes were visually checked in native exports and the installed app; see the [verification record](verification.md). The README's theme-specific header PNGs use the same native component with transparency.
 
 **Geist Sans** remains the interface typeface and the small window title uses weight 500 for legibility. Geist Mono remains the typeface for logs and technical values. The Geist families are bundled locally with their SIL Open Font Licenses. Source: [Vercel Geist](https://vercel.com/font).
 
