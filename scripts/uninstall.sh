@@ -10,7 +10,9 @@ Usage: ./scripts/uninstall.sh [options]
   --dry-run      Show exact removal targets without deleting anything
   --help         Show this help
 
-Quit Dockey first. This never uninstalls Docker/Colima or removes engine resources.
+Quit Dockey first with Command-Q, menu bar > Quit Dockey, or Dock > Quit.
+The red window close button only hides it. This never uninstalls Docker/Colima
+or removes engine resources.
 USAGE
 }
 app="$HOME/Applications/Dockey.app"
@@ -33,7 +35,7 @@ if $purge; then [ ! -L "$support" ] || dockey_die "refusing a symbolic-link Appl
 if [ -e "$app" ]; then
     dockey_validate_app "$app"
     app="$(cd "$(dirname "$app")" && pwd -P)/Dockey.app"
-    if dockey_app_is_running "$app"; then dockey_die "quit Dockey before uninstalling: $app"; fi
+    if dockey_app_is_running "$app"; then dockey_die "quit Dockey with Command-Q, menu bar > Quit Dockey, or Dock > Quit before uninstalling (closing the window only hides it): $app"; fi
     printf 'Remove app: %s\n' "$app"
     if ! $dry_run; then rm -rf "$app"; fi
 else

@@ -1,6 +1,6 @@
 # Verification record
 
-Local validation on October 28, 2026, for the native alpha, 0.1.2 service-icon update, and 0.1.3 AI Focus alignment. The first published alpha was 0.1.1; the unpublished 0.1.0 tag failed hosted Intel GUI validation.
+Local validation on October 28, 2026, for the native alpha through 0.1.4 window lifecycle and Dock visibility. The first published alpha was 0.1.1; the unpublished 0.1.0 tag failed hosted Intel GUI validation.
 
 ## Environment
 
@@ -15,7 +15,7 @@ Local validation on October 28, 2026, for the native alpha, 0.1.2 service-icon u
 
 ## Automated checks
 
-The Swift suite contains **68 tests**, covering Compose-label grouping, local endpoint validation, argument validation, partial operation failures, redaction, UTF-8 log limits, concurrent pipe draining, process timeouts, persistent event/stats streams, cancellation, context invalidation, demo isolation, event-driven state coordination, and registry-specific service recognition. Focused regressions cover inspection/resource/log failures and retry, stale context responses, active-container filtering, resource changes during event gaps, draining event bursts while inventory is held, actual Docker image IDs, and credentials inside opaque labels/driver options. The local unit, resource-layout, and disposable installation/archive checks passed. Hosted CI repeats the complete suite for each architecture.
+The Swift suite contains **75 tests**, covering Compose-label grouping, local endpoint validation, argument validation, partial operation failures, redaction, UTF-8 log limits, concurrent pipe draining, process timeouts, persistent event/stats streams, cancellation, context invalidation, demo isolation, event-driven state coordination, and registry-specific service recognition. Focused regressions cover inspection/resource/log failures and retry, stale context responses, active-container filtering, resource changes during event gaps, draining event bursts while inventory is held, actual Docker image IDs, and credentials inside opaque labels/driver options. Seven lifecycle checks cover one-window reuse, weak ownership, forwarding optional AppKit delegate callbacks, minimize/hide visibility, explicit quit cleanup, utility modes, and pausing/resuming streams. The local unit, resource-layout, and disposable installation/archive checks passed. Hosted CI repeats the complete suite for each architecture.
 
 Installer checks cover installation, replacement, dry runs, removal, refusal of unrelated or symbolic-link targets, ZIP extraction, and signature integrity. The final release app was also installed and removed at a separate temporary destination, then installed at the default per-user path. The release ZIP and SHA-256 were generated successfully.
 
@@ -34,6 +34,8 @@ The release app was opened from the per-user Applications directory and connecte
 Demo-mode UI checks verified individual lifecycle controls, stop confirmation, search, details, Settings, and appearance changes. [Dark](screenshots/dockey-dark.png) and [light](screenshots/dockey-light.png) screenshots were exported from the native release app using synthetic demo resources. They are interface evidence, not live-engine screenshots.
 
 The modern state selector was checked with keyboard selection, and the custom checkbox exposed a native checked/unchecked accessibility value while updating the filtered list. Settings were checked in both appearances. The obsolete polling-interval setting was removed; [live updates](performance.md) describes the event stream, visible metrics, cache behavior, and measured CLI bottleneck.
+
+In 0.1.4 native UI checks, both the red close button and Cmd-W retained the same app process and single Docker event connection while stopping the stats stream. Reopening reused the single main window; foreground metrics resumed. Choosing Quit Dockey from the native application menu exited the app and its recorded CLI children. All 33 existing containers retained their IDs, state, start time, and restart count through these checks. The menu bar uses SwiftUI's native MenuBarExtra with Show Dockey and Quit Dockey; its actions and Dock reopen routing are covered by the lifecycle implementation and fixtures. The automation surface could not address the macOS Dock itself, so its context menu was not directly clicked. Dock artwork was inspected at 64 and 128 pixels; its stronger rim and halo are static baked assets.
 
 The 0.1.2 failure views were also exercised in the installed app using an ignored, synthetic CLI fixture that cannot invoke Docker. Failed image loads showed an inline error and recovered through Retry. Failed inspection disabled JSON copying and kept Mounts in an explicit error state; successful retry then showed the genuine empty-mount result. Interrupted logs showed a separate error and truthful footer, then recovered through Retry. Switching detail tabs preserved the same log process. Dockey's original executable preference and Colima connection were restored, and no synthetic CLI children remained. These are UI failure-state checks, not live-engine mutation tests; their captures are excluded from public documentation.
 

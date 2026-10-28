@@ -200,6 +200,7 @@ struct ContainerDetailView: View {
         case .following: return "Following container output"
         case .ended: return container.isRunning ? "Log connection ended" : "Container stopped · log output complete"
         case .failed: return "Log connection interrupted"
+        case .paused: return "Log output paused while window is hidden"
         }
     }
 

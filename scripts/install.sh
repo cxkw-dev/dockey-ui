@@ -10,7 +10,9 @@ Usage: ./scripts/install.sh [options]
   --open                  Open the installed app
   --help                  Show this help
 
-No sudo is needed for the default per-user installation. Quit Dockey before updating it.
+No sudo is needed for the default per-user installation. Quit Dockey before
+updating: use Command-Q, menu bar > Quit Dockey, or Dock > Quit. The red window
+close button only hides Dockey and leaves it running.
 USAGE
 }
 source_app=""
@@ -34,7 +36,7 @@ destination="$(dockey_canonical_directory "$destination")"
 target="$destination/Dockey.app"
 [ "$source_app" != "$target" ] || dockey_die "source and destination are the same app"
 dockey_validate_existing_target "$target"
-if dockey_app_is_running "$target"; then dockey_die "quit Dockey before updating: $target"; fi
+if dockey_app_is_running "$target"; then dockey_die "quit Dockey with Command-Q, menu bar > Quit Dockey, or Dock > Quit before updating (closing the window only hides it): $target"; fi
 staging="$(mktemp -d "$destination/.dockey-install.XXXXXX")"
 trap 'dockey_cleanup_staging "$staging" "$target"' EXIT
 ditto "$source_app" "$staging/Dockey.app"

@@ -7,7 +7,6 @@ struct RootView: View {
     @ObservedObject var store: AppStore
     @Environment(\.colorScheme) private var scheme
     @Environment(\.openSettings) private var openSettings
-    @Environment(\.scenePhase) private var scenePhase
     @ViewState<StopRequest?> private var stopRequest = nil
     @FocusState private var contextMenuFocused: Bool
     @ViewState<Bool> private var contextMenuHovered = false
@@ -48,15 +47,10 @@ struct RootView: View {
         .frame(minWidth: 900, minHeight: 580)
         .toolbar { toolbar }
         .task { await store.start() }
-        .onAppear { store.setApplicationActive(scenePhase == .active) }
-        .onChange(of: scenePhase) { _, phase in store.setApplicationActive(phase == .active) }
         .onPreferenceChange(DockeyMetricsVisibilityKey.self) { visible in
             Task { @MainActor in store.setMetricsVisible(visible) }
         }
-        .onDisappear {
-            store.setMetricsVisible(false)
-            store.setApplicationActive(false)
-        }
+        .onDisappear { store.setMainWindowVisible(false) }
         .onChange(of: store.selectedContext) { _, _ in Task { await store.refresh() } }
         .confirmationDialog(
             "Stop existing containers?",

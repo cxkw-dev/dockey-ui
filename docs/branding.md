@@ -18,9 +18,20 @@ Source: `design-assets/dockey-mark.svg`. The identical prototype export is `prot
 
 Keep the mark small beside the name in the sidebar. A larger version can appear in About and the empty state. Resource icons and lifecycle controls retain the existing restrained SVG icon system.
 
-The macOS Dock icon uses a matte charcoal tile and a larger mascot, with a soft teal halo around the flat figure. The tile gives the icon normal Dock presence and keeps its silhouette visible on dark backgrounds; the sidebar and source vector remain flat. The native icon renderer and bundled `AppIcon.icns` use the same artwork.
+The macOS Dock icon uses a matte charcoal tile and a larger mascot, with a brighter teal rim and halo that remain visible at Dock scale. This glow treatment belongs to the Dock artwork; the sidebar mascot and source vector remain flat. The native icon renderer and bundled `AppIcon.icns` use the same artwork.
 
 [Dock icon PNG](../design-assets/dockey-dock-icon.png)
+
+## Regenerate Dock assets
+
+The native renderer in [`DockeyIcon.swift`](../Sources/Dockey/Design/DockeyIcon.swift) defines the Dock treatment. After changing it, run:
+
+```sh
+./scripts/generate-app-icon.sh
+./scripts/build-app.sh
+```
+
+The generator builds the release renderer, exports `design-assets/dockey-dock-icon.png`, and uses Apple's `sips` and `iconutil` to create every canonical size in `Sources/Dockey/Resources/AppIcon.icns`. The normal app build afterward copies the updated ICNS into the SwiftPM resource bundle and final app. The generator's optional `--skip-build` is for an already-current renderer; regenerate and rebuild the bundle before distributing it.
 
 ## Action colors
 

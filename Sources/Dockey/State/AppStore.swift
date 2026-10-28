@@ -3,7 +3,7 @@ import Combine
 import DockeyCore
 import Foundation
 
-enum LogStreamState: Equatable { case idle, connecting, following, ended, failed }
+enum LogStreamState: Equatable { case idle, connecting, following, ended, failed, paused }
 
 @MainActor
 final class AppStore: ObservableObject {
@@ -68,6 +68,7 @@ final class AppStore: ObservableObject {
     private var inventoryInvalidated = false
     private var resourcesInvalidated: Set<String> = []
     private var isApplicationActive = false
+    private var isMainWindowVisible = true
     private var areMetricsVisible = false
     private var engineInfoTask: Task<Void, Never>?
     private var resourceTasks: [String: Task<Void, Never>] = [:]
@@ -321,6 +322,31 @@ final class AppStore: ObservableObject {
         }
     }
 
+    func setMainWindowVisible(_ visible: Bool) {
+        guard isMainWindowVisible != visible, !isShuttingDown else { return }
+        isMainWindowVisible = visible
+        updateStatsSubscription()
+        if visible {
+            if selectedContainerID != nil {
+                beginLogs(clearBuffer: false)
+                if inspection == nil {
+                    detailTask = Task { [weak self] in await self?.retryInspection() }
+                }
+            }
+        } else {
+            logTask?.cancel()
+            logTask = nil
+            currentLogRequest = nil
+            detailTask?.cancel()
+            detailTask = nil
+            inspectionTask?.cancel()
+            inspectionTask = nil
+            currentDetailRequest = nil
+            isLoadingInspection = false
+            if selectedContainerID != nil { logStreamState = .paused }
+        }
+    }
+
     func setMetricsVisible(_ visible: Bool) {
         guard areMetricsVisible != visible else { return }
         areMetricsVisible = visible
@@ -447,7 +473,7 @@ final class AppStore: ObservableObject {
     }
 
     private func updateStatsSubscription() {
-        guard !isDemo, !isShuttingDown, isApplicationActive, areMetricsVisible, isConnected,
+        guard !isDemo, !isShuttingDown, isApplicationActive, isMainWindowVisible, areMetricsVisible, isConnected,
             containers.contains(where: { [.running, .paused, .restarting].contains($0.state) }), let client
         else {
             stopStatsSubscription()
@@ -759,7 +785,7 @@ final class AppStore: ObservableObject {
     }
 
     func retryInspection() async {
-        guard let container = selectedContainer else { return }
+        guard isMainWindowVisible, !isShuttingDown, let container = selectedContainer else { return }
         let id = container.id
         let context = selectedContext
         let generation = configurationGeneration
@@ -800,7 +826,11 @@ final class AppStore: ObservableObject {
     func retryLogs() { beginLogs(clearBuffer: false) }
 
     private func beginLogs(clearBuffer: Bool) {
-        guard let container = selectedContainer else { return }
+        guard let container = selectedContainer, !isShuttingDown else { return }
+        guard isMainWindowVisible else {
+            logStreamState = .paused
+            return
+        }
         logTask?.cancel()
         let id = container.id
         let context = selectedContext

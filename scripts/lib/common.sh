@@ -3,7 +3,7 @@
 
 DOCKEY_NAME="Dockey"
 DOCKEY_BUNDLE_ID="dev.dockey.app"
-DOCKEY_DEFAULT_VERSION="0.1.3"
+DOCKEY_DEFAULT_VERSION="0.1.4"
 DOCKEY_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 DOCKEY_PROJECT_DIR="$(cd "$DOCKEY_SCRIPT_DIR/.." && pwd -P)"
 

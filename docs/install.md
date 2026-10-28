@@ -40,7 +40,7 @@ Choose a destination or an already-built app:
 ./scripts/install.sh --app dist/Dockey.app --destination ~/Applications --open
 ```
 
-The destination is a directory; the final app is always named `Dockey.app`. The scripts refuse to overwrite a symlink, a non-Dockey bundle, or an app running from that exact target path. Quit the installed copy before updating it.
+The destination is a directory; the final app is always named `Dockey.app`. The scripts refuse to overwrite a symlink, a non-Dockey bundle, or an app running from that exact target path. Quit the installed copy before updating it: use Dockey's **⌘Q**, **Quit Dockey** from its menu bar item, or **Dock → Quit**. The red close button only hides its window and leaves the app running.
 
 The default native launch check requires a macOS graphical session and Python 3, available with the development tools used for source builds. It re-signs temporary app copies in both flat SwiftPM and wrapped SwiftBuild resource layouts. Each layout must reject a missing font or service mark, verify intact resources, and export a readable demo PNG. Only temporary copies are modified and removed. To check a downloaded/extracted bundle, use `./scripts/check-app-launch.sh --app /path/to/Dockey.app`. The default per-launch limit is 30 seconds; `--timeout SECONDS` can adjust it.
 
@@ -53,7 +53,7 @@ An explicit `./scripts/check-app-launch.sh --resources-only` runs both layouts' 
 Download both the ZIP and its matching `.sha256` file into the same folder and verify before extracting:
 
 ```sh
-shasum -a 256 -c Dockey-0.1.3-macos-arm64.zip.sha256
+shasum -a 256 -c Dockey-0.1.4-macos-arm64.zip.sha256
 ```
 
 Extract the archive and move `Dockey.app` to `~/Applications` or your normal Applications folder. The script can also install the extracted app using `--app`.
@@ -68,9 +68,15 @@ If the CLI is not detected, open **Settings → Connections** and choose the ins
 
 Quitting or uninstalling Dockey leaves the engine and existing containers running. Opening the app does not start Colima, create containers, or apply a Compose project.
 
+## Close, reopen, and quit
+
+The red close button or **⌘W** hides the main window while Dockey keeps running. Click the Dock icon or choose **Show Dockey** from its menu bar item to bring the window back. The same menu provides **Quit Dockey**.
+
+To end Dockey, activate it and press **⌘Q**, choose **Quit Dockey** from its menu bar item, or choose **Quit** from its Dock menu. Quitting cancels Dockey's own work; Docker Engine and existing containers continue independently. Closing the window is not enough before replacing or uninstalling the app.
+
 ## Update
 
-Quit Dockey before replacing it.
+Quit Dockey with **⌘Q**, **Quit Dockey** from its menu bar item, or **Dock → Quit** before replacing it. The red close button hides the window and leaves the running process in place.
 
 For a source installation, open your checkout and check `git status --short`. Preserve any local changes before updating; the installer does not fetch source or reset your checkout. On the branch you intend to follow, fetch its latest changes, review them and the release notes, then rebuild:
 
@@ -85,7 +91,7 @@ Preferences are retained. The initial release has no automatic updater; nothing 
 
 ## Uninstall
 
-Quit the app, then move its exact `.app` bundle to the Trash. Preferences can remain if you plan to reinstall.
+Quit the app with **⌘Q**, **Quit Dockey** from its menu bar item, or **Dock → Quit**, then move its exact `.app` bundle to the Trash. Closing the window only hides it. Preferences can remain if you plan to reinstall.
 
 The repository includes an exact-path uninstaller:
 
@@ -117,7 +123,7 @@ Optional preference removal:
 ## Produce a distributable archive
 
 ```sh
-./scripts/build-app.sh --version 0.1.3
+./scripts/build-app.sh --version 0.1.4
 ./scripts/check-app-launch.sh
 ./scripts/package-release.sh
 ```

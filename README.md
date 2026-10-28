@@ -34,6 +34,7 @@ Built with **SwiftUI and AppKit**. No Electron, browser server, account, or tele
 | Recognize services | Official monochrome ClickHouse, Langfuse, Temporal, and standalone MongoDB marks; AI Focus's F; Redis cache lines; and a Lucide elephant for PostgreSQL. Icons share a consistent layout with adjusted visual sizes. [Sources and licenses](docs/service-icons.md). |
 | Choose a connection | Select a local Docker context within Dockey. The global Docker CLI context is unchanged. |
 | Stay current | Docker events drive container updates; live metrics stream while visible. No repeating inventory polling. |
+| Keep Dockey nearby | Closing its window hides it. Reopen from the Dock or menu bar; choose Quit to end the app. |
 | Make it comfortable | System/light/dark appearance, compact/comfortable rows, log preferences, and stop confirmation. |
 
 **This is an early native release.** Group controls operate on existing containers; they do not apply Compose files or promise dependency ordering. Container creation, deletion/prune, terminal sessions, remote engines, and runtime resource editing are outside this first release. [The feature inventory](docs/features-and-settings.md) records the broader design work.
@@ -69,9 +70,11 @@ open ~/Applications/Dockey.app --args --demo
 
 Demo mode uses synthetic resources and simulated actions. It never connects to Docker. Quit the app before switching between demo and live launches.
 
+The red close button or **⌘W** hides Dockey's window while the app keeps running. Click its Dock icon or choose **Show Dockey** from its menu bar item to reopen it. To quit, activate Dockey and press **⌘Q**, choose **Quit Dockey** from its menu bar item, or choose **Quit** from its Dock menu. Quitting leaves Docker and existing containers running.
+
 ## Uninstall
 
-Quit Dockey, then move **`~/Applications/Dockey.app`** to the Trash. To use the exact-path script instead:
+Quit Dockey with **⌘Q**, **Quit Dockey** from its menu bar item, or **Dock → Quit**, then move **`~/Applications/Dockey.app`** to the Trash. Closing the window only hides the running app and is insufficient for updating or uninstalling. To use the exact-path script instead:
 
 ```sh
 ./scripts/uninstall.sh --dry-run

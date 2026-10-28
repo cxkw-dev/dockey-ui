@@ -138,6 +138,48 @@ struct AppStoreFailureTests {
         #expect(!visible.contains(.dead))
     }
 
+    @Test
+    func hidingMainWindowPausesDetailStreamsWithoutLosingSelectionOrBuffer() async throws {
+        let fixture = try makeFixture()
+        defer { fixture.close() }
+        await fixture.store.start()
+        try await waitUntil { await fixture.runner.inventoryReads >= 2 && !fixture.store.isRefreshing }
+        fixture.store.setApplicationActive(true)
+        fixture.store.setMetricsVisible(true)
+        fixture.store.selectedContainerID = try #require(fixture.store.containers.first).id
+        fixture.store.retryLogs()
+        try await waitUntil {
+            let counts = await fixture.runner.streamCounts()
+            return counts.stats == 1 && counts.logs == 1
+        }
+        let selected = fixture.store.selectedContainerID
+        let text = fixture.store.logText
+        let statsRequests = await fixture.runner.statsStreamRequests
+        let logRequests = await fixture.runner.logStreamRequests
+        fixture.store.setMainWindowVisible(false)
+        try await waitUntil {
+            let counts = await fixture.runner.streamCounts()
+            return counts.stats == 0 && counts.logs == 0
+        }
+        #expect(fixture.store.selectedContainerID == selected)
+        #expect(fixture.store.logText == text)
+        #expect(fixture.store.logStreamState == .paused)
+        fixture.store.setMetricsVisible(false)
+        fixture.store.setMetricsVisible(true)
+        fixture.store.retryLogs()
+        #expect(await fixture.runner.statsStreamRequests == statsRequests)
+        #expect(await fixture.runner.logStreamRequests == logRequests)
+        #expect(await fixture.runner.activeEventStreams == 1, "Docker events can stay connected while the main window is hidden.")
+        fixture.store.setMainWindowVisible(true)
+        try await waitUntil {
+            let counts = await fixture.runner.streamCounts()
+            return counts.statsRequests == statsRequests + 1 && counts.logRequests == logRequests + 1
+                && counts.stats == 1 && counts.logs == 1
+        }
+        #expect(fixture.store.selectedContainerID == selected)
+        #expect(fixture.store.logStreamState == .following)
+    }
+
     private func makeFixture() throws -> FailureFixture {
         let domain = "dev.dockey.failure-tests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: domain))
@@ -172,6 +214,15 @@ private struct FailureFixture {
 private actor FailureRunner: CommandRunning {
     private let id = String(repeating: "a", count: 64)
     private(set) var inventoryReads = 0
+    private(set) var statsStreamRequests = 0
+    private(set) var logStreamRequests = 0
+    private var streamKinds: [UUID: String] = [:]
+    var activeStatsStreams: Int { streamKinds.values.filter { $0 == "stats" }.count }
+    var activeLogStreams: Int { streamKinds.values.filter { $0 == "logs" }.count }
+    var activeEventStreams: Int { streamKinds.values.filter { $0 == "events" }.count }
+    func streamCounts() -> (stats: Int, logs: Int, statsRequests: Int, logRequests: Int) {
+        (activeStatsStreams, activeLogStreams, statsStreamRequests, logStreamRequests)
+    }
     private var inspectionFails = false
     private var imagesFail = false
     private var logsFail = false
@@ -235,13 +286,20 @@ private actor FailureRunner: CommandRunning {
     nonisolated func stream(_ request: CommandRequest) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let token = UUID()
-            Task { await register(request, continuation: continuation, token: token) }
-            continuation.onTermination = { @Sendable _ in Task { await self.remove(token) } }
+            let registration = Task { await register(request, continuation: continuation, token: token) }
+            continuation.onTermination = { @Sendable _ in
+                registration.cancel()
+                Task { await self.remove(token) }
+            }
         }
     }
 
     private func register(_ request: CommandRequest, continuation: AsyncThrowingStream<String, Error>.Continuation,
         token: UUID) {
+        guard !Task.isCancelled else { return }
+        let kind = request.arguments.contains("logs") ? "logs" : request.arguments.contains("stats") ? "stats" : "events"
+        if kind == "stats" { statsStreamRequests += 1 }
+        if kind == "logs" { logStreamRequests += 1 }
         if request.arguments.contains("logs") {
             if logsFail {
                 continuation.yield("output before interruption\n")
@@ -251,6 +309,10 @@ private actor FailureRunner: CommandRunning {
             continuation.yield("fresh output\n")
         }
         continuations[token] = continuation
+        streamKinds[token] = kind
     }
-    private func remove(_ token: UUID) { continuations.removeValue(forKey: token) }
+    private func remove(_ token: UUID) {
+        continuations.removeValue(forKey: token)
+        streamKinds.removeValue(forKey: token)
+    }
 }

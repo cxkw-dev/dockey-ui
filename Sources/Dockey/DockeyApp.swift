@@ -10,6 +10,8 @@ struct LaunchOptions {
     let verifyResources: Bool
     let iconDarkPreview: Bool
 
+    var showsMenuBarItem: Bool { !verifyResources && screenshotPath == nil && iconPath == nil }
+
     init(arguments: [String] = CommandLine.arguments) {
         verifyResources = arguments.contains("--verify-resources")
         iconDarkPreview = arguments.contains("--icon-dark-preview")
@@ -29,9 +31,11 @@ struct LaunchOptions {
 struct DockeyApp: App {
     @NSApplicationDelegateAdaptor(DockeyAppDelegate.self) private var appDelegate
     @StateObject private var store: AppStore
+    private let launchOptions: LaunchOptions
 
     init() {
         let options = LaunchOptions()
+        launchOptions = options
         if options.screenshotPath != nil, !options.demo {
             fputs("Documentation screenshots require --demo. No live Docker data was captured.\n", stderr)
             exit(EXIT_FAILURE)
@@ -74,9 +78,10 @@ struct DockeyApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Dockey", id: "main") {
+        Window("Dockey", id: "main") {
             RootView(store: store)
-                .onAppear { appDelegate.store = store }
+                .onAppear { appDelegate.bindStore(store) }
+                .background(DockeyWindowBridge(lifecycle: appDelegate.mainWindow))
                 .preferredColorScheme(colorScheme)
                 .frame(minWidth: 900, minHeight: 600)
         }
@@ -95,14 +100,43 @@ struct DockeyApp: App {
             DockeySettingsView(store: store)
                 .preferredColorScheme(colorScheme)
         }
+        MenuBarExtra(isInserted: .constant(launchOptions.showsMenuBarItem)) {
+            DockeyStatusMenu(lifecycle: appDelegate.mainWindow)
+        } label: {
+            Image(nsImage: DockeyMenuBarIcon.image).renderingMode(.template)
+                .accessibilityLabel("Dockey")
+        }
+        .menuBarExtraStyle(.menu)
     }
 }
 
 @MainActor
 final class DockeyAppDelegate: NSObject, NSApplicationDelegate {
     weak var store: AppStore?
+    let mainWindow = MainWindowLifecycle()
 
-    func applicationWillTerminate(_ notification: Notification) { store?.shutdown() }
+    func bindStore(_ store: AppStore) {
+        self.store = store
+        mainWindow.visibilityChanged = { [weak store] visible in store?.setMainWindowVisible(visible) }
+        mainWindow.updateVisibility(applicationHidden: NSApp.isHidden)
+        store.setApplicationActive(NSApp.isActive)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        mainWindow.prepareForTermination()
+        store?.shutdown()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) { store?.setApplicationActive(true) }
+    func applicationDidResignActive(_ notification: Notification) { store?.setApplicationActive(false) }
+    func applicationDidHide(_ notification: Notification) { mainWindow.updateVisibility(applicationHidden: true) }
+    func applicationDidUnhide(_ notification: Notification) { mainWindow.updateVisibility() }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // Return false after showing the existing window, suppressing AppKit's untitled-window fallback.
+        guard !mainWindow.isTerminating else { return false }
+        return !mainWindow.show()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -133,7 +167,7 @@ final class DockeyAppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 
 @MainActor
@@ -149,58 +183,6 @@ enum AppScreenshot {
         guard let data = bitmap.representation(using: .png, properties: [:]) else {
             throw CocoaError(.fileWriteUnknown)
         }
-        try FileManager.default.createDirectory(
-            at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: destination, options: .atomic)
-    }
-}
-
-@MainActor
-enum DockeyIcon {
-    static func render(darkPreview: Bool = false) -> NSImage? {
-        let renderer = ImageRenderer(
-            content:
-                DockeyMascot()
-                .frame(width: 1100, height: 1100)
-                .frame(width: 1024, height: 1024)
-        )
-        renderer.scale = 1
-        guard let mascot = renderer.cgImage,
-            let space = CGColorSpace(name: CGColorSpace.sRGB),
-            let context = CGContext(
-                data: nil, width: 1024, height: 1024, bitsPerComponent: 8, bytesPerRow: 0, space: space,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-        else { return nil }
-        if darkPreview {
-            context.setFillColor(CGColor(srgbRed: 0.063, green: 0.075, blue: 0.09, alpha: 1))
-            context.fill(CGRect(x: 0, y: 0, width: 1024, height: 1024))
-        }
-        let tile = CGPath(
-            roundedRect: CGRect(x: 32, y: 32, width: 960, height: 960),
-            cornerWidth: 218, cornerHeight: 218, transform: nil)
-        context.addPath(tile)
-        context.setFillColor(CGColor(srgbRed: 0.10, green: 0.115, blue: 0.14, alpha: 1))
-        context.fillPath()
-        context.saveGState()
-        context.addPath(tile)
-        context.clip()
-        context.setShadow(
-            offset: .zero, blur: 32, color: CGColor(srgbRed: 0.39, green: 0.82, blue: 0.84, alpha: 0.36))
-        context.draw(mascot, in: CGRect(x: 0, y: 0, width: 1024, height: 1024))
-        context.restoreGState()
-        context.addPath(tile)
-        context.setStrokeColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.07))
-        context.setLineWidth(2)
-        context.strokePath()
-        guard let image = context.makeImage() else { return nil }
-        return NSImage(cgImage: image, size: NSSize(width: 1024, height: 1024))
-    }
-
-    static func write(to destination: URL, darkPreview: Bool = false) throws {
-        guard let image = render(darkPreview: darkPreview), let tiff = image.tiffRepresentation,
-            let rep = NSBitmapImageRep(data: tiff),
-            let data = rep.representation(using: .png, properties: [:])
-        else { throw CocoaError(.fileWriteUnknown) }
         try FileManager.default.createDirectory(
             at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: destination, options: .atomic)

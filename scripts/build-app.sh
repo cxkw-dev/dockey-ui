@@ -7,7 +7,7 @@ usage() {
 Usage: ./scripts/build-app.sh [options]
   --configuration release|debug  Build configuration (default: release)
   --arch arm64|x86_64             Build one architecture (default: current Mac)
-  --version VERSION              Bundle version (default: 0.1.3)
+  --version VERSION              Bundle version (default: 0.1.4)
   --output-dir DIRECTORY         Bundle destination (default: ./dist)
   --skip-build                   Package an already-built executable
   --sign IDENTITY                codesign identity (default: ad-hoc "-")
@@ -52,7 +52,7 @@ bin_dir="$(cd "$DOCKEY_PROJECT_DIR" && swift build "${build_args[@]}" --show-bin
 output_dir="$(dockey_canonical_directory "$output_dir")"
 target="$output_dir/Dockey.app"
 dockey_validate_existing_target "$target"
-if dockey_app_is_running "$target"; then dockey_die "quit this Dockey app before replacing it: $target"; fi
+if dockey_app_is_running "$target"; then dockey_die "quit this Dockey app with Command-Q or Dock > Quit before replacing it (closing the window only hides it): $target"; fi
 staging="$(mktemp -d "$output_dir/.dockey-build.XXXXXX")"
 trap 'dockey_cleanup_staging "$staging" "$target"' EXIT
 app="$staging/Dockey.app"
