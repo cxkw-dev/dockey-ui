@@ -1,0 +1,28 @@
+name: Bug report
+description: Report a reproducible Dockey problem.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the trigger, actual behavior, and expected behavior. Remove private resource names and paths.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Dockey, macOS, Mac architecture, Docker CLI/Engine, and runtime such as Colima.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence
+      description: Optional screenshot or error text. Do not upload credentials, environment values, raw inspect output, or private container logs.

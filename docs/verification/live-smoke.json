@@ -1,0 +1,20 @@
+{
+  "architecture" : "aarch64",
+  "checks" : [
+    "local context discovery",
+    "container inspection and Compose grouping",
+    "engine info",
+    "images",
+    "volumes",
+    "networks",
+    "resource stats",
+    "fixture stop",
+    "fixture start",
+    "fixture restart",
+    "log tail",
+    "cancellable log stream"
+  ],
+  "engineVersion" : "29.5.2",
+  "passed" : true,
+  "scope" : "Read-only discovery plus lifecycle operations on one labelled disposable fixture. No existing workloads were modified."
+}

@@ -1,0 +1,108 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source_audit:
+    name: Public source secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install pinned local scanner
+        run: |
+          python3 -m venv "$RUNNER_TEMP/scanner-venv"
+          "$RUNNER_TEMP/scanner-venv/bin/pip" install detect-secrets==1.5.0
+          echo "$RUNNER_TEMP/scanner-venv/bin" >> "$GITHUB_PATH"
+      - name: Scan tracked source without credential verification
+        run: ./scripts/check-secrets.sh
+
+  macos:
+    name: macOS / ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: swift --version
+      - name: Unit and installation checks
+        run: ./scripts/check.sh
+      - name: Build app bundle
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            ./scripts/build-app.sh --version "${GITHUB_REF_NAME#v}"
+          else
+            ./scripts/build-app.sh
+          fi
+      - name: Package app and checksum
+        run: ./scripts/package-release.sh
+      - name: Upload locally signed build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Dockey-${{ matrix.runner }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  prerelease:
+    name: Publish tagged prerelease
+    needs: [macos, source_audit]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Download both architecture builds
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: Dockey-*
+          path: release-assets
+          merge-multiple: true
+      - name: Verify assets and publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Expected a version tag such as v0.1.0" >&2; exit 1; }
+          notes="docs/releases/$tag.md"
+          test -f "$notes" || { echo "Missing release notes: $notes" >&2; exit 1; }
+          assets=()
+          for architecture in arm64 x86_64; do
+            name="Dockey-${tag#v}-macos-$architecture.zip"
+            test -f "release-assets/$name"
+            test -f "release-assets/$name.sha256"
+            (cd release-assets && sha256sum -c "$name.sha256")
+            assets+=("release-assets/$name" "release-assets/$name.sha256")
+          done
+          gh release create "$tag" "${assets[@]}" \
+            --verify-tag --title "Dockey $tag" --notes-file "$notes" \
+            --prerelease --latest=false
