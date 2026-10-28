@@ -94,11 +94,8 @@ struct RootView: View {
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 8) {
-                DockeyMascot().frame(width: 32, height: 32)
-                DockeyWordmark()
-            }
-            .padding(.horizontal, 9).padding(.top, 15).padding(.bottom, 21)
+            DockeyBrandLockup()
+                .padding(.horizontal, 9).padding(.top, 15).padding(.bottom, 21)
 
             ForEach(AppSection.allCases) { section in
                 Button {
@@ -184,7 +181,9 @@ struct RootView: View {
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        ToolbarItem(placement: .principal) { DockeyWordmark(size: 14) }
+        ToolbarItem(placement: .principal) {
+            Text("Dockey").font(DockeyFonts.ui(14, weight: .medium))
+        }
         ToolbarItemGroup(placement: .primaryAction) {
             if store.isDemo {
                 Label("Demo · sample data", systemImage: "sparkles")

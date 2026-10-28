@@ -300,16 +300,12 @@ struct DockeySettingsView: View {
 
     private var about: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 15) {
-                DockeyMascot().frame(width: 70, height: 70)
-                VStack(alignment: .leading, spacing: 6) {
-                    DockeyWordmark(size: 29)
-                    Text(
-                        "Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.4")"
-                    )
-                    .font(DockeyFonts.ui(11)).foregroundStyle(palette.muted)
-                }
-            }.padding(.bottom, 23)
+            DockeyBrandLockup(mascotSize: 70, wordmarkSize: 42, spacing: 15)
+            Text(
+                "Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.5")"
+            )
+            .font(DockeyFonts.ui(11)).foregroundStyle(palette.muted)
+            .padding(.leading, 85).padding(.top, 6).padding(.bottom, 23)
             Text("A native Mac companion for your local Docker Engine.")
                 .font(DockeyFonts.ui(13)).padding(.bottom, 12)
             Text("Built with SwiftUI and AppKit. Docker Engine and its runtime are installed and managed separately.")
@@ -321,7 +317,7 @@ struct DockeySettingsView: View {
             }.padding(.vertical, 15)
             sectionTitle("Credits & licenses")
             Text(
-                "Original Dockey mascot artwork. Geist Sans and Geist Mono are bundled with their SIL Open Font License notices. See the repository for application licensing and third-party notices."
+                "Original Dockey mascot artwork. Geist fonts and Leckerli One wordmark lettering include their SIL Open Font License notices. See the repository for application licensing and third-party notices."
             )
             .font(DockeyFonts.ui(11)).foregroundStyle(palette.muted).padding(.vertical, 14)
             Link(

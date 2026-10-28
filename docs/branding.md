@@ -4,11 +4,13 @@ Product name: **Dockey**. Selected layout: **A — Grouped list**.
 
 ## Wordmark
 
-Use **Geist Sans Semibold (600)** with -0.04em letter spacing. This keeps the wordmark aligned with the Vercel-inspired interface, while the heavier weight, compact spacing, and mascot provide the brand identity. Use weight 500 for the small window title and preserve the wordmark as selectable text.
+The wordmark uses bold, connected script lettering inspired by the supplied reference, flattened to a single foreground color. It is light on dark surfaces and charcoal on light surfaces. There is no surrounding badge, extrusion, texture, or shadow. The teal-outlined mascot remains the color accent.
 
-The typeface is bundled locally in `prototypes/assets/fonts/`, with its SIL Open Font License in `Geist-OFL.txt`. Source: [Vercel Geist](https://vercel.com/font).
+The lettering is shaped from **Leckerli One**, with a slight additional forward lean, and exported to static native paths and a portable [SVG](../design-assets/dockey-wordmark.svg). Rounded brush strokes give it a softer, heavier silhouette. Pinned source, hashes, and licensing are recorded in [wordmark/SOURCE.json](../design-assets/wordmark/SOURCE.json). The upstream font and notices live under `design-assets/wordmark/vendor/`; the app bundles the notices but does not load or ship the script font at runtime.
 
-Geist Sans is shared across the wordmark and interface. Geist Mono remains the typeface for logs and technical values.
+Regenerate both vector representations offline on macOS using `swift scripts/generate-wordmark.swift`. The generator checks the source font's pinned SHA-256 before exporting. A shared brand component keeps the mascot and wordmark aligned: the sidebar lettering is 28 points high with a 3-point optical downward adjustment, and About scales this to 42 points. The version label sits below the About component so it cannot displace the lettering relative to the mascot. The native path is cached; rendering performs no font shaping, file reads, or image decoding.
+
+**Geist Sans** remains the interface typeface and the small window title uses weight 500 for legibility. Geist Mono remains the typeface for logs and technical values. The Geist families are bundled locally with their SIL Open Font Licenses. Source: [Vercel Geist](https://vercel.com/font).
 
 ## Mark
 
@@ -18,7 +20,9 @@ Source: `design-assets/dockey-mark.svg`. The identical prototype export is `prot
 
 Keep the mark small beside the name in the sidebar. A larger version can appear in About and the empty state. Resource icons and lifecycle controls retain the existing restrained SVG icon system.
 
-The macOS Dock icon uses a matte charcoal tile and a larger mascot, with a brighter teal rim and halo that remain visible at Dock scale. This glow treatment belongs to the Dock artwork; the sidebar mascot and source vector remain flat. The native icon renderer and bundled `AppIcon.icns` use the same artwork.
+The native app mascot adds the Dock artwork's pale teal outline to the sidebar, About, and empty states. The outline scales for readability at the small sidebar size; the character stays flat, with no glow or shadow inside the app. The source SVG retains the original flat mark.
+
+The macOS Dock icon uses a matte charcoal tile and a larger mascot, with a brighter teal rim and halo that remain visible at Dock scale. The glow belongs to the Dock artwork. The native icon renderer and bundled `AppIcon.icns` use the same artwork.
 
 [Dock icon PNG](../design-assets/dockey-dock-icon.png)
 

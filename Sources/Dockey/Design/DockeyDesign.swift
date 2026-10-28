@@ -110,13 +110,32 @@ extension Color {
 }
 
 struct DockeyWordmark: View {
-    var size: CGFloat = 19
+    var size: CGFloat = 28
     var body: some View {
-        Text("Dockey").font(DockeyFonts.ui(size, weight: .semibold)).tracking(-size * 0.04)
+        DockeyWordmarkShape()
+            .fill()
+            .frame(width: size * DockeyWordmarkShape.aspectRatio, height: size)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Dockey")
+            .accessibilityAddTraits(.isImage)
     }
 }
 
-/// Native vector rendition of design-assets/dockey-mark.svg.
+struct DockeyBrandLockup: View {
+    var mascotSize: CGFloat = 32
+    var wordmarkSize: CGFloat = 28
+    var spacing: CGFloat = 8
+
+    var body: some View {
+        HStack(spacing: spacing) {
+            DockeyMascot().frame(width: mascotSize, height: mascotSize)
+            // Center the main lettering optically; the script descender extends below it.
+            DockeyWordmark(size: wordmarkSize).offset(y: wordmarkSize * 3 / 28)
+        }
+    }
+}
+
+/// Native vector mascot based on design-assets/dockey-mark.svg.
 struct DockeyMascot: View {
     enum Treatment { case flat, dock }
     var treatment: Treatment = .flat
@@ -126,6 +145,8 @@ struct DockeyMascot: View {
     var body: some View {
         GeometryReader { geometry in
             let side = min(geometry.size.width, geometry.size.height)
+            // Keep the outline readable in the 32-point sidebar without thickening Dock artwork.
+            let rimScale = treatment == .dock ? 1 : max(1, 64 / max(side, 1))
             ZStack {
                 Canvas { context, _ in
                     var arms = Path()
@@ -133,22 +154,20 @@ struct DockeyMascot: View {
                     arms.addQuadCurve(to: CGPoint(x: 34, y: 34), control: CGPoint(x: 24, y: 52))
                     arms.move(to: CGPoint(x: 93, y: 65))
                     arms.addQuadCurve(to: CGPoint(x: 94, y: 34), control: CGPoint(x: 104, y: 52))
-                    if treatment == .dock {
-                        context.stroke(arms, with: .color(rim), style: StrokeStyle(lineWidth: 9.2, lineCap: .round))
-                    }
+                    context.stroke(
+                        arms, with: .color(rim), style: StrokeStyle(lineWidth: 7 + 2.2 * rimScale, lineCap: .round))
                     context.stroke(arms, with: .color(charcoal), style: StrokeStyle(lineWidth: 7, lineCap: .round))
                     for x in [38.0, 72.0] {
                         let foot = Path(ellipseIn: CGRect(x: x, y: 103, width: 18, height: 14))
                         context.fill(foot, with: .color(charcoal))
-                        if treatment == .dock { context.stroke(foot, with: .color(rim), lineWidth: 1.3) }
+                        context.stroke(foot, with: .color(rim), lineWidth: 1.3 * rimScale)
                     }
                     context.fill(bodyPath, with: .color(charcoal))
-                    if treatment == .dock {
-                        context.stroke(bodyPath, with: .color(rim), style: StrokeStyle(lineWidth: 1.3, lineJoin: .round))
-                    }
+                    context.stroke(
+                        bodyPath, with: .color(rim), style: StrokeStyle(lineWidth: 1.3 * rimScale, lineJoin: .round))
                     let crate = Path(roundedRect: CGRect(x: 36, y: 11, width: 56, height: 28), cornerRadius: 5)
                     context.fill(crate, with: .color(Color(hex: treatment == .dock ? 0x92D6DA : 0x6BAEB3)))
-                    if treatment == .dock { context.stroke(crate, with: .color(rim), lineWidth: 1) }
+                    context.stroke(crate, with: .color(rim), lineWidth: rimScale)
                     var ribs = Path()
                     for x in [48.0, 64.0, 80.0] {
                         ribs.move(to: CGPoint(x: x, y: 18))
@@ -159,7 +178,7 @@ struct DockeyMascot: View {
                     for x in [34.0, 94.0] {
                         let hand = Path(ellipseIn: CGRect(x: x - 4.5, y: 31.5, width: 9, height: 9))
                         context.fill(hand, with: .color(charcoal))
-                        if treatment == .dock { context.stroke(hand, with: .color(rim), lineWidth: 1.1) }
+                        context.stroke(hand, with: .color(rim), lineWidth: 1.1 * rimScale)
                     }
                     for x in [49.0, 79.0] {
                         context.fill(

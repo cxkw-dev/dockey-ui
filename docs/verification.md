@@ -1,6 +1,6 @@
 # Verification record
 
-Local validation on October 28, 2026, for the native alpha through 0.1.4 window lifecycle and Dock visibility. The first published alpha was 0.1.1; the unpublished 0.1.0 tag failed hosted Intel GUI validation.
+Local validation on October 28, 2026, for the native alpha through 0.1.5 branding, window lifecycle, and Dock visibility. The first published alpha was 0.1.1; the unpublished 0.1.0 tag failed hosted Intel GUI validation.
 
 ## Environment
 
@@ -32,6 +32,8 @@ Mutation tests targeted only a labelled disposable Alpine container with no moun
 The release app was opened from the per-user Applications directory and connected to the real local engine. Native UI checks verified project grouping, search, real log following, redacted inspection, image inventory, and stop/start of a separate disposable fixture. Stop confirmation displayed the exact container name and selected context. The fixture was removed after testing.
 
 Demo-mode UI checks verified individual lifecycle controls, stop confirmation, search, details, Settings, and appearance changes. [Dark](screenshots/dockey-dark.png) and [light](screenshots/dockey-light.png) screenshots were exported from the native release app using synthetic demo resources. They are interface evidence, not live-engine screenshots.
+
+The 0.1.5 native exports show the script wordmark and teal mascot outline in both themes. Installed-app UI checks also verified the sidebar and larger About artwork. The small sidebar outline remains visible, and the wordmark fits beside it without clipping. The wordmark uses compiled vector paths; its source font and license are pinned in the repository and the font is not bundled into the runtime app.
 
 The modern state selector was checked with keyboard selection, and the custom checkbox exposed a native checked/unchecked accessibility value while updating the filtered list. Settings were checked in both appearances. The obsolete polling-interval setting was removed; [live updates](performance.md) describes the event stream, visible metrics, cache behavior, and measured CLI bottleneck.
 

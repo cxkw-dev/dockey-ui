@@ -1,2 +1,5 @@
 # Retain upstream font license notices verbatim, including their whitespace.
 *-OFL.txt whitespace=-blank-at-eol
+design-assets/wordmark/vendor/OFL.txt whitespace=-blank-at-eol
+design-assets/wordmark/vendor/FONTLOG.txt whitespace=-blank-at-eol,-blank-at-eof
+Sources/Dockey/Resources/BrandingLicenses/LeckerliOne-FONTLOG.txt whitespace=-blank-at-eol,-blank-at-eof

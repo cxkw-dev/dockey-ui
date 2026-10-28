@@ -1,0 +1,25 @@
+{
+  "family": "Leckerli One",
+  "style": "Regular",
+  "repository": "https://github.com/google/fonts",
+  "revision": "9862abc066c9b83bf84c3e8ed1fc2d8d48f9bbf0",
+  "license": "SIL Open Font License 1.1",
+  "usage": "Dockey lettering shaped with CoreText and exported as static vector outlines, with an additional 0.12 forward shear. The source font is not an app runtime dependency.",
+  "files": [
+    {
+      "file": "LeckerliOne-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/9862abc066c9b83bf84c3e8ed1fc2d8d48f9bbf0/ofl/leckerlione/LeckerliOne-Regular.ttf",
+      "sha256": "3f38ed99a07ab426eaa64c7d5773850a5dc8e6719b03125efce2cfbc82b083d7"
+    },
+    {
+      "file": "OFL.txt",
+      "url": "https://raw.githubusercontent.com/google/fonts/9862abc066c9b83bf84c3e8ed1fc2d8d48f9bbf0/ofl/leckerlione/OFL.txt",
+      "sha256": "2937c7789b0e4fdeda6eafe93164a2ab36e20386704c4cb6f87b1deb620ec0da"
+    },
+    {
+      "file": "FONTLOG.txt",
+      "url": "https://raw.githubusercontent.com/google/fonts/9862abc066c9b83bf84c3e8ed1fc2d8d48f9bbf0/ofl/leckerlione/FONTLOG.txt",
+      "sha256": "a0cc79f7c5e1aeb280e2d414f8a8eb2aa8fa86e3ac535836a21448c55085e6d7"
+    }
+  ]
+}

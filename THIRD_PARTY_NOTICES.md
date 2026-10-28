@@ -9,7 +9,13 @@ Dockey bundles unmodified Geist Sans and Geist Mono font files, distributed unde
 - `prototypes/assets/fonts/Geist-OFL.txt`
 - `prototypes/assets/fonts/GeistMono-OFL.txt`
 
-The native app uses Geist Sans for its interface and wordmark and Geist Mono for logs and technical values. Source: [Vercel Geist](https://vercel.com/font).
+The native app uses Geist Sans for its interface and window title and Geist Mono for logs and technical values. Source: [Vercel Geist](https://vercel.com/font).
+
+## Script wordmark
+
+The static Dockey wordmark is shaped from Leckerli One. Copyright (c) 2011 Gesine Todt, with Reserved Font Names "Leckerli" and "Leckerli One". The upstream font is distributed under the **SIL Open Font License, Version 1.1**. Its unmodified source, OFL notice, and FONTLOG are retained under `design-assets/wordmark/vendor/`; the full notices also ship in `Sources/Dockey/Resources/BrandingLicenses/`.
+
+Source: [google/fonts, ofl/leckerlione](https://github.com/google/fonts/tree/9862abc066c9b83bf84c3e8ed1fc2d8d48f9bbf0/ofl/leckerlione). Pinned hashes and usage are recorded in `design-assets/wordmark/SOURCE.json`. `scripts/generate-wordmark.swift` shapes the name with CoreText, adds a 0.12 forward shear, and exports filled SVG and native SwiftUI paths. The font file is a source asset and is not bundled in the app; the runtime uses the compiled vector outline.
 
 ## Platform and external tools
 
