@@ -1,6 +1,6 @@
 # Service illustrations and brand research
 
-Dockey uses original service-identification illustrations: analytical columns, a leaf and document, cache layers, and a small elephant. They belong to Dockey's quiet badge family and use the repository's [Apache-2.0 license](../LICENSE). They are **not official vendor logos**, copied logo paths, or evidence of vendor approval. Product names identify the software suggested by an image reference.
+Dockey uses original service-identification illustrations: analytical columns, a leaf and document, cache layers, and a small elephant. Their glyphs are monochrome in both appearances. They belong to Dockey's quiet badge family and use the repository's [Apache-2.0 license](../LICENSE). They are **not official vendor logos**, copied logo paths, or evidence of vendor approval. Product names identify the software suggested by an image reference.
 
 The original SVG artwork lives in `design-assets/services/`. No official vendor SVG or vendor-specific artwork license is bundled. Dockey does not fetch icons from the network at runtime. Keep the illustrations separate from the Dockey mascot and retain accessible product labels; the illustration alone should not determine identity.
 

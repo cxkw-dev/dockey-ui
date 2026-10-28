@@ -42,7 +42,9 @@ Choose a destination or an already-built app:
 
 The destination is a directory; the final app is always named `Dockey.app`. The scripts refuse to overwrite a symlink, a non-Dockey bundle, or an app running from that exact target path. Quit the installed copy before updating it.
 
-The native launch check requires a macOS graphical session and Python 3, available with the development tools used for source builds. It creates temporary copies with both flat SwiftPM and wrapped SwiftBuild resource bundles and re-signs the copies. Each layout must reject a missing font, verify intact resources, and export a readable demo screenshot. Only temporary copies are modified and removed. To check a downloaded/extracted bundle, use `./scripts/check-app-launch.sh --app /path/to/Dockey.app`. The default per-launch limit is 30 seconds; `--timeout SECONDS` can adjust it.
+The default native launch check requires a macOS graphical session and Python 3, available with the development tools used for source builds. It re-signs temporary app copies in both flat SwiftPM and wrapped SwiftBuild resource layouts. Each layout must reject a missing font, verify intact resources, and export a readable demo PNG. Only temporary copies are modified and removed. To check a downloaded/extracted bundle, use `./scripts/check-app-launch.sh --app /path/to/Dockey.app`. The default per-launch limit is 30 seconds; `--timeout SECONDS` can adjust it.
+
+An explicit `./scripts/check-app-launch.sh --resources-only` runs both layouts' startup, font/license, and missing-font checks without opening a window or exporting PNGs. It provides **no GUI rendering coverage** and does not suppress unexpected verification failures. CI uses this mode only for its Intel hosted runner, whose Metal device fails during rendering; Apple Silicon CI retains the full PNG gate. Physical Intel visual compatibility has not been verified. The default check never falls back to resources-only mode.
 
 ## Release ZIPs and Gatekeeper
 
@@ -51,7 +53,7 @@ The native launch check requires a macOS graphical session and Python 3, availab
 Download both the ZIP and its matching `.sha256` file into the same folder and verify before extracting:
 
 ```sh
-shasum -a 256 -c Dockey-0.1.0-macos-arm64.zip.sha256
+shasum -a 256 -c Dockey-0.1.1-macos-arm64.zip.sha256
 ```
 
 Extract the archive and move `Dockey.app` to `~/Applications` or your normal Applications folder. The script can also install the extracted app using `--app`.
@@ -108,13 +110,13 @@ Optional preference removal:
 ## Produce a distributable archive
 
 ```sh
-./scripts/build-app.sh --version 0.1.0
+./scripts/build-app.sh --version 0.1.1
 ./scripts/check-app-launch.sh
 ./scripts/package-release.sh
 ```
 
 To build a single non-default architecture, pass `--arch arm64` or `--arch x86_64` to `build-app.sh`. The archive name is derived from the actual Mach-O executable, not a manually supplied label.
 
-The CI version-tag workflow builds and tests both architectures, including launching the actual copied app and validating its resources/demo PNG, before a separate publishing job verifies the checksums and creates a prerelease. Add `docs/releases/vVERSION.md` before pushing a version tag. This does not change the signing status of the artifacts.
+The CI version-tag workflow builds and tests both architectures. Both verify startup/resources in flat and wrapped copied-app layouts; Apple Silicon additionally renders and decodes demo PNGs. Intel's explicit resources-only check does not verify GUI compatibility. Only after these declared gates pass does a separate job verify checksums and create a prerelease. Add `docs/releases/vVERSION.md` before pushing a version tag. This does not change the signing status of the artifacts.
 
 For an established Developer ID release, build with `--sign "Developer ID Application: ..."`, then submit the archive to Apple's notary service and staple the approved ticket before publication. The script enables hardened runtime and timestamping for a real identity; it does not create certificates, access a developer account, or claim notarization. Configure credentials outside the repository, and reverify the final app and checksum after any signing/stapling change. [Apple's notarization documentation](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution) describes the required account setup and commands.

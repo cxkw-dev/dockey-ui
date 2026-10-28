@@ -17,7 +17,7 @@ Use demo mode while changing UI. If you test against a live engine, keep the sel
 
 For a focused Swift test run, use `./scripts/test.sh --filter DockerParsingTests`. The wrapper disables XCTest discovery and loads the selected toolchain's Swift Testing macro plugin when necessary, allowing the same suite to work with full Xcode and Command Line Tools. Pass other `swift test` options through this wrapper rather than hardcoding a toolchain path.
 
-Run the app launch check from a macOS graphical session after bundling. It converts temporary app copies into both flat SwiftPM and wrapped SwiftBuild resource layouts, then re-signs them. Each layout must reject a missing font; each intact app must verify its bundled notices/fonts and export a readable demo PNG. Both Mac CI runners perform this check before creating release archives. `check.sh` also tests the resource conversion without launching the app.
+Run the default app launch check from a macOS graphical session after bundling. It re-signs temporary app copies in both flat SwiftPM and wrapped SwiftBuild resource layouts. Each layout must reject a missing font, verify intact fonts/notices, and export a readable demo PNG. Apple Silicon CI runs this full check. Intel CI explicitly selects `--resources-only` because its hosted Metal device cannot render the app: startup, fonts/notices, and negative checks remain required, but there is no Intel GUI coverage. Unexpected startup failures still fail, and the script never falls back automatically. Physical Intel visual verification remains outstanding. `check.sh` also tests layout conversion and explicit mode behavior without launching the app.
 
 ## Code expectations
 

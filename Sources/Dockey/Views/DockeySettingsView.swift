@@ -304,7 +304,7 @@ struct DockeySettingsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     DockeyWordmark(size: 29)
                     Text(
-                        "Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0")"
+                        "Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.1")"
                     )
                     .font(DockeyFonts.ui(11)).foregroundStyle(palette.muted)
                 }

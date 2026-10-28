@@ -1,6 +1,6 @@
 # Verification record
 
-Local validation on October 28, 2026, for the initial 0.1.0 native alpha.
+Local validation on October 28, 2026, for the native alpha. The first published alpha targets 0.1.1; the unpublished 0.1.0 tag failed hosted Intel GUI validation.
 
 ## Environment
 
@@ -19,7 +19,7 @@ The Swift suite contains **54 tests**, covering Compose-label grouping, local en
 
 Installer checks cover installation, replacement, dry runs, removal, refusal of unrelated or symbolic-link targets, ZIP extraction, and signature integrity. The final release app was also installed and removed at a separate temporary destination, then installed at the default per-user path. The release ZIP and SHA-256 were generated successfully.
 
-The copied-app launch check also passed locally for both flat and wrapped resource-bundle layouts: a re-signed copy missing one font was explicitly rejected, while each intact copy verified its bundled fonts and license notices and exported a decodable demo PNG. CI runs this same native launch gate on both Mac architectures. It catches resource lookup differences between Command Line Tools and Xcode SwiftPM builds that compilation and signature checks alone cannot detect.
+The copied-app launch check passed locally on Apple Silicon for both flat and wrapped resource-bundle layouts: a re-signed copy missing one font was explicitly rejected, while each intact copy verified its bundled fonts and license notices and exported a decodable demo PNG. Apple Silicon CI retains this full native gate. Intel CI explicitly verifies startup/resources and missing-font rejection in both layouts without window/PNG rendering. Both modes catch resource lookup differences that compilation and signature checks alone cannot detect; only the full mode provides visual rendering evidence.
 
 ## Real engine integration
 
@@ -44,5 +44,7 @@ Before the initial push, all intended tracked files were checked for credentials
 The local detect-secrets 1.5.0 scan passed after auditing one false positive caused by the scanner package's version string inside the workflow. The scan rejected a separate synthetic credential candidate. CI repeats the tracked-file scan with network credential verification disabled. Ignored local inventories, build output, environment files, and signing material are excluded from publication. These checks reduce accidental disclosure risk; they do not guarantee detection of every possible secret.
 
 ## Compatibility limits
+
+The initial hosted Intel GUI check aborted after successful font verification with Metal's `Target device architecture is nil` assertion in `MTLLoader`. Both architectures' 54 Swift tests passed in that run, and Apple Silicon passed the native PNG checks; this does not establish Intel GUI compatibility. The workflow now records `system_profiler SPDisplaysDataType` diagnostics on Intel and explicitly selects `--resources-only` there. Both layouts still require missing-font rejection and intact startup/font/license verification. Apple Silicon still requires demo PNG rendering. There is no automatic fallback and no suppression of unexpected failures. **Physical Intel visual compatibility remains unverified.**
 
 This is evidence for the listed local environment. The repository's CI separately tests and packages Apple Silicon and Intel builds; its public run results are available in [Actions](https://github.com/cxkw-dev/dockey-ui/actions). It does not establish live Docker compatibility across every macOS, engine, or runtime version. Release archives are ad-hoc signed, not Developer ID signed or notarized.

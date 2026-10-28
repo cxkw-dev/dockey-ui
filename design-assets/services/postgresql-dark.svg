@@ -1,12 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-labelledby="title description">
   <title id="title">Dockey PostgreSQL illustration — dark</title>
   <desc id="description">Original Dockey illustration licensed under Apache-2.0. A presentation hint, not an official vendor logo or provenance guarantee.</desc>
-  <rect width="24" height="24" rx="6" fill="#171819"/>
-  <rect x=".5" y=".5" width="23" height="23" rx="5.5" fill="none" stroke="#2D3030"/>
-  <ellipse cx="6.7" cy="12.5" rx="3.4" ry="4.6" fill="#8EABC4" fill-opacity=".18" stroke="#8EABC4" stroke-width="1.2"/>
-  <ellipse cx="17.3" cy="12.5" rx="3.4" ry="4.6" fill="#8EABC4" fill-opacity=".18" stroke="#8EABC4" stroke-width="1.2"/>
-  <rect x="7.2" y="5.5" width="9.6" height="12.4" rx="4.8" fill="#8EABC4"/>
-  <path d="M12 14.5V18.5Q12 21 14.4 21Q16.8 21 16.8 18.6" fill="none" stroke="#8EABC4" stroke-width="3.2" stroke-linecap="round"/>
-  <circle cx="9.8" cy="10.4" r=".75" fill="#FAFAF8"/>
-  <circle cx="14.2" cy="10.4" r=".75" fill="#FAFAF8"/>
+  <ellipse cx="6.7" cy="12.5" rx="3.4" ry="4.6" fill="#B8B8B8" fill-opacity=".18" stroke="#B8B8B8" stroke-width="1.2"/>
+  <ellipse cx="17.3" cy="12.5" rx="3.4" ry="4.6" fill="#B8B8B8" fill-opacity=".18" stroke="#B8B8B8" stroke-width="1.2"/>
+  <rect x="7.2" y="5.5" width="9.6" height="12.4" rx="4.8" fill="#B8B8B8"/>
+  <path d="M12 14.5V18.5Q12 21 14.4 21Q16.8 21 16.8 18.6" fill="none" stroke="#B8B8B8" stroke-width="3.2" stroke-linecap="round"/>
+  <circle cx="9.8" cy="10.4" r=".75" fill="#FAFAFA"/>
+  <circle cx="14.2" cy="10.4" r=".75" fill="#FAFAFA"/>
 </svg>

@@ -3,8 +3,10 @@
 
 import importlib.util
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 
 spec = importlib.util.spec_from_file_location(
@@ -15,6 +17,48 @@ spec.loader.exec_module(launch_check)
 
 
 class ResourceLayoutTests(unittest.TestCase):
+    def exercise_resources_only(self, intact_status):
+        with tempfile.TemporaryDirectory(prefix="dockey-layout-test-") as temporary:
+            root = Path(temporary)
+            app = root / "fixture/Dockey.app"
+            fonts = launch_check.resource_bundle(app) / "Resources/Fonts"
+            fonts.mkdir(parents=True)
+            (fonts / "Geist-Regular.ttf").write_bytes(b"fixture font")
+            stage = root / "stage"
+            stage.mkdir()
+
+            def copy_fixture(source, directory):
+                directory.mkdir()
+                destination = directory / "Dockey.app"
+                shutil.copytree(source, destination)
+                return destination
+
+            responses = [
+                (1, "Dockey bundled font verification failed."),
+                (intact_status, "Dockey bundled fonts verified."),
+            ]
+            with mock.patch.object(launch_check, "copy_app", side_effect=copy_fixture), \
+                mock.patch.object(launch_check, "resign_app"), \
+                mock.patch.object(launch_check, "launch", side_effect=responses) as launch, \
+                mock.patch.object(launch_check, "verify_png") as png:
+                if intact_status == 0:
+                    launch_check.check_layout(app, stage, "flat", 1, resources_only=True)
+                else:
+                    with self.assertRaises(launch_check.LaunchCheckError):
+                        launch_check.check_layout(app, stage, "flat", 1, resources_only=True)
+                self.assertEqual(launch.call_count, 2)
+                for call in launch.call_args_list:
+                    self.assertEqual(call.args[1], ["--demo", "--verify-resources"])
+                png.assert_not_called()
+                broken = stage / "flat-missing-font/Dockey.app"
+                self.assertEqual(list(launch_check.resource_bundle(broken).rglob("Geist-Regular.ttf")), [])
+
+    def test_resources_only_skips_gui_but_keeps_negative_and_intact_startup_checks(self):
+        self.exercise_resources_only(intact_status=0)
+
+    def test_resources_only_does_not_suppress_intact_startup_failure(self):
+        self.exercise_resources_only(intact_status=1)
+
     def test_both_source_layouts_convert_to_both_target_layouts(self):
         for source_layout in ("flat", "wrapped"):
             for target_layout in ("flat", "wrapped"):

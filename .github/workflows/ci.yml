@@ -36,7 +36,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15, macos-15-intel]
+        include:
+          - runner: macos-15
+            launch_mode: full
+          - runner: macos-15-intel
+            launch_mode: resources-only
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     steps:
@@ -54,10 +58,18 @@ jobs:
           else
             ./scripts/build-app.sh
           fi
-      # Launch the copied .app, not just the development executable. This catches
-      # resource lookup differences between SwiftPM/Xcode and CLT toolchains.
-      - name: Verify app launch with both resource bundle layouts
+      - name: Report Intel hosted graphics capability
+        if: matrix.runner == 'macos-15-intel'
+        run: system_profiler SPDisplaysDataType
+      # Both modes launch the copied app and validate both resource layouts.
+      # Intel hosted Metal rendering fails independently of font verification;
+      # its explicit resources-only mode does not claim GUI coverage.
+      - name: Verify native GUI and both resource layouts (Apple Silicon)
+        if: matrix.launch_mode == 'full'
         run: ./scripts/check-app-launch.sh
+      - name: Verify startup and both resource layouts only (Intel; no GUI coverage)
+        if: matrix.launch_mode == 'resources-only'
+        run: ./scripts/check-app-launch.sh --resources-only
       - name: Package app and checksum
         run: ./scripts/package-release.sh
       - name: Upload locally signed build

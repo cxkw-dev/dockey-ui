@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Bounded native launch verification. All modified files and screenshots are temporary."""
 
+import argparse
 import os
 from pathlib import Path
 import plistlib
@@ -144,7 +145,7 @@ def verify_png(path):
     return width, height
 
 
-def check_layout(source, stage, layout, timeout):
+def check_layout(source, stage, layout, timeout, resources_only=False):
     intact_directory = stage / f"{layout}-intact"
     intact_app = copy_app(source, intact_directory)
     set_resource_layout(intact_app, layout)
@@ -162,9 +163,12 @@ def check_layout(source, stage, layout, timeout):
         raise LaunchCheckError(f"{layout}: missing bundled font was not explicitly rejected")
 
     screenshot = intact_directory / "dockey-demo.png"
+    arguments = ["--demo", "--verify-resources"]
+    if not resources_only:
+        arguments += ["--appearance", "dark", "--screenshot", str(screenshot)]
     status, output = launch(
         intact_app,
-        ["--demo", "--verify-resources", "--appearance", "dark", "--screenshot", str(screenshot)],
+        arguments,
         intact_directory,
         timeout,
     )
@@ -172,6 +176,13 @@ def check_layout(source, stage, layout, timeout):
         raise LaunchCheckError(f"{layout}: intact app exited with status {status}:\n{output}")
     if "Dockey bundled fonts verified." not in output:
         raise LaunchCheckError(f"{layout}: intact app did not confirm font verification")
+    if resources_only:
+        print(
+            f"Native resources-only check passed ({layout} resources): missing font rejected; "
+            "intact startup, fonts and licenses verified. GUI rendering and PNG export were NOT tested.",
+            flush=True,
+        )
+        return
     width, height = verify_png(screenshot)
     print(
         f"Native launch check passed ({layout} resources): missing font rejected; "
@@ -181,12 +192,18 @@ def check_layout(source, stage, layout, timeout):
 
 
 def main():
-    source = Path(sys.argv[1])
-    timeout = int(sys.argv[2])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("app", type=Path)
+    parser.add_argument("timeout", type=int)
+    parser.add_argument("--resources-only", action="store_true")
+    options = parser.parse_args()
+    source = options.app
+    timeout = options.timeout
     with tempfile.TemporaryDirectory(prefix="dockey-app-launch-") as temporary:
         for layout in ("flat", "wrapped"):
-            check_layout(source, Path(temporary), layout, timeout)
-    print("Both SwiftPM resource layouts passed. No Docker connection was used.")
+            check_layout(source, Path(temporary), layout, timeout, options.resources_only)
+    coverage = "resources only; no GUI coverage" if options.resources_only else "resources and native demo PNGs"
+    print(f"Both SwiftPM resource layouts passed ({coverage}). No Docker connection was used.")
 
 
 if __name__ == "__main__":

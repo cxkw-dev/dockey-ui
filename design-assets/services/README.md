@@ -14,8 +14,8 @@ image authenticity.
 | PostgreSQL | A small front-facing elephant character |
 | Generic | An outlined container cube |
 
-Every illustration uses a 24 × 24 coordinate system, a neutral tile with a
-6-point corner radius, and a muted accent. Light and dark references use the
+Every illustration uses a 24 × 24 coordinate system, a free-standing
+monochrome glyph without an outer border or tile. Light and dark references use the
 same geometry. The production app draws the matching geometry directly in
 [`ServiceIcon.swift`](../../Sources/Dockey/Design/ServiceIcon.swift), so it does
 not need SVG parsing, asset downloads, or a new rendering dependency.

@@ -31,7 +31,7 @@ Built with **SwiftUI and AppKit**. No Electron, browser server, account, or tele
 | Control existing containers | Start, stop, and restart one container or a group, with pending state and specific operation results. Start is muted green; Stop is muted red. |
 | Investigate a service | Follow bounded logs, inspect redacted configuration, and view ports, mounts, and current resource metrics. |
 | Inspect local resources | Browse images, volumes, and networks without deleting them. |
-| Recognize services | Original badges identify ClickHouse, MongoDB, Redis, and PostgreSQL image families, with a generic fallback. [Artwork and source research](docs/service-icons.md). |
+| Recognize services | Original monochrome icons identify ClickHouse, MongoDB, Redis, and PostgreSQL image families, with a generic fallback. [Artwork and source research](docs/service-icons.md). |
 | Choose a connection | Select a local Docker context within Dockey. The global Docker CLI context is unchanged. |
 | Stay current | Docker events drive container updates; live metrics stream while visible. No repeating inventory polling. |
 | Make it comfortable | System/light/dark appearance, compact/comfortable rows, log preferences, and stop confirmation. |
@@ -97,7 +97,7 @@ open dist/Dockey.app --args --demo
 
 `check.sh` runs the Swift Testing suite through `scripts/test.sh` and disposable installation/archive checks. The wrapper works with Command Line Tools installations that do not include XCTest and explicitly loads the selected toolchain's Swift Testing macro plugin when needed. The installer tests use an isolated signed fixture app, not your installed copy or Docker resources. CI runs on Apple Silicon and Intel macOS runners and produces app ZIPs and checksums.
 
-`check-app-launch.sh` exercises temporary copies of the actual `.app` in a macOS graphical session. It tests both flat SwiftPM and wrapped SwiftBuild resource bundles. Each layout must reject a missing bundled font, verify bundled fonts/licenses, and export a readable native demo screenshot within a bounded launch timeout. CI runs this check on both architectures before packaging. The check never connects to Docker.
+`check-app-launch.sh` exercises temporary app copies with both flat SwiftPM and wrapped SwiftBuild resource bundles. Its default check rejects a missing font, verifies intact fonts/licenses, and exports a readable native demo PNG within a bounded timeout. Apple Silicon CI runs this full check. Intel CI explicitly uses `--resources-only`: both layouts must pass startup/resource verification and missing-font rejection, but GUI rendering is not tested. The Intel hosted runner aborts during Metal rendering; physical Intel visual compatibility remains unverified. There is no automatic fallback, and neither mode connects to Docker. See [verification limits](docs/verification.md#compatibility-limits).
 
 [Refresh performance and measured bottlenecks →](docs/performance.md)
 

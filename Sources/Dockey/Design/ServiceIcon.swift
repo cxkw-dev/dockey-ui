@@ -8,24 +8,20 @@ struct ServiceIcon: View {
     var size: CGFloat = 24
     @Environment(\.colorScheme) private var scheme
 
-    private var colors: ServiceIconColors { ServiceIconColors(identity: identity, dark: scheme == .dark) }
+    private var colors: ServiceIconColors { ServiceIconColors(dark: scheme == .dark) }
 
     var body: some View {
         let colors = colors
-        ZStack {
-            RoundedRectangle(cornerRadius: size / 4).fill(colors.surface)
-            RoundedRectangle(cornerRadius: size / 4).strokeBorder(colors.border, lineWidth: 1)
-            Canvas { context, canvasSize in
-                var context = context
-                let scale = min(canvasSize.width, canvasSize.height) / 24
-                context.scaleBy(x: scale, y: scale)
-                switch identity {
-                case .clickhouse: analytics(context, colors: colors)
-                case .mongodb: document(context, colors: colors)
-                case .redis: cache(context, colors: colors)
-                case .postgresql: elephant(context, colors: colors)
-                case .generic: container(context, colors: colors)
-                }
+        Canvas { context, canvasSize in
+            var context = context
+            let scale = min(canvasSize.width, canvasSize.height) / 24
+            context.scaleBy(x: scale, y: scale)
+            switch identity {
+            case .clickhouse: analytics(context, colors: colors)
+            case .mongodb: document(context, colors: colors)
+            case .redis: cache(context, colors: colors)
+            case .postgresql: elephant(context, colors: colors)
+            case .generic: container(context, colors: colors)
             }
         }
         .frame(width: size, height: size)
@@ -114,7 +110,7 @@ struct ServiceIcon: View {
         for x in [9.8, 14.2] {
             context.fill(
                 Path(ellipseIn: CGRect(x: x - 0.75, y: 9.65, width: 1.5, height: 1.5)),
-                with: .color(Color(hex: 0xFAFAF8)))
+                with: .color(Color(hex: 0xFAFAFA)))
         }
     }
 
@@ -141,19 +137,7 @@ struct ServiceIcon: View {
 }
 
 private struct ServiceIconColors {
-    let identity: ServiceIdentity
     let dark: Bool
-    var surface: Color { Color(hex: dark ? 0x171819 : 0xFAFAF9) }
-    var border: Color { Color(hex: dark ? 0x2D3030 : 0xE5E6E5) }
-    var accent: Color {
-        let value: UInt32
-        switch identity {
-        case .clickhouse: value = dark ? 0xD0B76F : 0x9B7E24
-        case .mongodb: value = dark ? 0x83B49A : 0x477D65
-        case .redis: value = dark ? 0xCF9096 : 0xA65F63
-        case .postgresql: value = dark ? 0x8EABC4 : 0x567E9D
-        case .generic: value = dark ? 0xB0B6BC : 0x6D7278
-        }
-        return Color(hex: value)
-    }
+    var surface: Color { Color(hex: dark ? 0x0A0A0A : 0xFFFFFF) }
+    var accent: Color { Color(hex: dark ? 0xB8B8B8 : 0x626262) }
 }
