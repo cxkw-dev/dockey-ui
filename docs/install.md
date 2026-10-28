@@ -53,7 +53,7 @@ An explicit `./scripts/check-app-launch.sh --resources-only` runs both layouts' 
 Download both the ZIP and its matching `.sha256` file into the same folder and verify before extracting:
 
 ```sh
-shasum -a 256 -c Dockey-0.1.2-macos-arm64.zip.sha256
+shasum -a 256 -c Dockey-0.1.3-macos-arm64.zip.sha256
 ```
 
 Extract the archive and move `Dockey.app` to `~/Applications` or your normal Applications folder. The script can also install the extracted app using `--app`.
@@ -117,7 +117,7 @@ Optional preference removal:
 ## Produce a distributable archive
 
 ```sh
-./scripts/build-app.sh --version 0.1.2
+./scripts/build-app.sh --version 0.1.3
 ./scripts/check-app-launch.sh
 ./scripts/package-release.sh
 ```

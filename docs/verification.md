@@ -1,6 +1,6 @@
 # Verification record
 
-Local validation on October 28, 2026, for the native alpha and 0.1.2 service-icon update. The first published alpha was 0.1.1; the unpublished 0.1.0 tag failed hosted Intel GUI validation.
+Local validation on October 28, 2026, for the native alpha, 0.1.2 service-icon update, and 0.1.3 AI Focus alignment. The first published alpha was 0.1.1; the unpublished 0.1.0 tag failed hosted Intel GUI validation.
 
 ## Environment
 
@@ -52,5 +52,7 @@ The service-icon update also records exact public upstream commit IDs and verifi
 ## Compatibility limits
 
 The initial hosted Intel GUI check aborted after successful font verification with Metal's `Target device architecture is nil` assertion in `MTLLoader`. Both architectures' 54 Swift tests passed in that run, and Apple Silicon passed the native PNG checks; this does not establish Intel GUI compatibility. The workflow now records `system_profiler SPDisplaysDataType` diagnostics on Intel and explicitly selects `--resources-only` there. Both layouts still require missing-font rejection and intact startup/font/license verification. Apple Silicon still requires demo PNG rendering. There is no automatic fallback and no suppression of unexpected failures. **Physical Intel visual compatibility remains unverified.**
+
+As an additional check, the CI-built 0.1.2 `x86_64` archive from [the successful main run](https://github.com/cxkw-dev/dockey-ui/actions/runs/40773454256) was downloaded, checksum-checked, extracted, and signature-verified locally. Its full native launch check passed for both resource layouts under the already installed Rosetta on Apple Silicon, including missing-resource rejection and decodable demo PNGs. This verifies a translated Intel build on this host, not graphical behavior on physical Intel hardware.
 
 This is evidence for the listed local environment. The repository's CI separately tests and packages Apple Silicon and Intel builds; its public run results are available in [Actions](https://github.com/cxkw-dev/dockey-ui/actions). It does not establish live Docker compatibility across every macOS, engine, or runtime version. Release archives are ad-hoc signed, not Developer ID signed or notarized.

@@ -15,7 +15,8 @@ struct ServiceIcon: View {
     private var opticalSize: CGFloat {
         switch identity {
         case .clickhouse: size * 18 / 24
-        case .langfuse, .temporal, .postgresql, .aiFocus: size * 22 / 24
+        case .langfuse, .temporal, .postgresql: size * 22 / 24
+        case .aiFocus: size * 18 / 24
         case .mongodb: size * 23 / 24
         default: size
         }
@@ -27,6 +28,7 @@ struct ServiceIcon: View {
             if let image = ServiceIconResources.image(for: identity, dark: scheme == .dark) {
                 Image(nsImage: image).resizable().renderingMode(.original).scaledToFit()
                     .frame(width: opticalSize, height: opticalSize)
+                    .offset(x: identity == .aiFocus ? size / 48 : 0)
             } else {
                 Canvas { context, canvasSize in
                     var context = context

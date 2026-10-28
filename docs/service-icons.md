@@ -36,7 +36,7 @@ Do not arbitrarily tint vendor marks, simplify their paths, combine them with th
 
 AI Focus uses the project owner's current F mark, extracted from its existing app icon as a standalone monochrome silhouette. The yellow tile is omitted. Its derivation and hashes are recorded in [`AI_FOCUS_SOURCE.json`](../design-assets/services/AI_FOCUS_SOURCE.json). This custom identification is limited to the explicitly configured, unqualified `ai-focus` repository; it does not assign that identity to arbitrary namespaces or registries.
 
-Every row reserves the same 24-point icon slot. Actual drawing sizes balance visible weight: ClickHouse uses 18 points, Langfuse/Temporal/PostgreSQL/AI Focus 22, and MongoDB 23 for its narrow leaf. Source geometry and aspect ratios remain intact. Original Redis and generic glyphs retain their drawing grids.
+Every row reserves the same 24-point icon slot. Actual drawing sizes balance visible weight: ClickHouse and AI Focus use 18 points, Langfuse/Temporal/PostgreSQL 22, and MongoDB 23 for its narrow leaf. AI Focus has a half-point optical shift to balance its heavier left stem. Source geometry and aspect ratios remain intact. Original Redis and generic glyphs retain their drawing grids.
 
 `ServiceIdentity` matches explicit registry/repository pairs. Container names, Compose service names, substrings, and arbitrary mirrors do not establish a match. Tags and valid digests are normalized first.
 
