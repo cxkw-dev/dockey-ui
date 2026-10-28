@@ -9,12 +9,15 @@ Use macOS 14+ and Swift 6+. Clone the repository, then run:
 ```sh
 ./scripts/check.sh
 ./scripts/build-app.sh
+./scripts/check-app-launch.sh
 open dist/Dockey.app --args --demo
 ```
 
 Use demo mode while changing UI. If you test against a live engine, keep the selected context explicit and use only disposable resources you created. Never prune a developer's engine, stop existing project services, delete a VM, or remove volumes as a testing shortcut.
 
 For a focused Swift test run, use `./scripts/test.sh --filter DockerParsingTests`. The wrapper disables XCTest discovery and loads the selected toolchain's Swift Testing macro plugin when necessary, allowing the same suite to work with full Xcode and Command Line Tools. Pass other `swift test` options through this wrapper rather than hardcoding a toolchain path.
+
+Run the app launch check from a macOS graphical session after bundling. It verifies the copied `.app`, not just a development executable: missing fonts must fail verification, while the intact app must validate its bundled notices/fonts and export a readable demo PNG. Both Mac CI runners perform this check before creating release archives.
 
 ## Code expectations
 

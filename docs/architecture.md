@@ -55,7 +55,9 @@ Unit fixtures test parsing, grouping, command boundaries, error propagation, red
 
 ## Packaging
 
-SwiftPM produces the executable and `Dockey_Dockey.bundle`. The build script places the executable in `Contents/MacOS` and the resource bundle in `Contents/Resources`, where `Bundle.module` can find it after installation. Fonts, their license files, and app artwork remain inside the bundle. Packaging must be validated after copying away from `.build`, so a development fallback path cannot hide missing resources.
+SwiftPM produces the executable and `Dockey_Dockey.bundle`. The build script places the executable in `Contents/MacOS` and the resource bundle in `Contents/Resources`. Packaged apps resolve that resource bundle explicitly from the installed app's standard Resources directory: SwiftPM-generated `Bundle.module` lookup differs between Xcode/native SwiftPM and Command Line Tools/SwiftBuild toolchains. Fonts, their license files, and app artwork remain inside the bundle.
+
+`scripts/check-app-launch.sh` copies the signed app to an isolated temporary directory. A negative check removes one font from a disposable, re-signed copy and requires explicit resource-verification failure, proving build-directory fallback cannot hide a broken app. The intact copy must verify its bundled fonts and notices, launch in demo mode, exit within a timeout, and export a PNG that ImageIO can decode. CI runs the real app check on both Mac runners after building and before packaging. It never reads live Docker resources or replaces the user's installed copy.
 
 Local builds use an ad-hoc signature. A trusted downloaded release needs separate Developer ID signing and notarization; those require publisher credentials and are not implied by successful compilation or `codesign --verify`. ZIP checksums apply to the exact final archive.
 

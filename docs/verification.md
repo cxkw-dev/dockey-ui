@@ -19,6 +19,8 @@ Local validation on October 28, 2026, for the initial 0.1.0 native alpha.
 
 Installer checks cover installation, replacement, dry runs, removal, refusal of unrelated or symbolic-link targets, ZIP extraction, and signature integrity. The final release app was also installed and removed at a separate temporary destination, then installed at the default per-user path. The release ZIP and SHA-256 were generated successfully.
 
+The copied-app launch check also passed locally: a re-signed copy missing one font was explicitly rejected, while an intact copy verified its bundled fonts and license notices and exported a decodable demo PNG. CI runs this same native launch gate on both Mac architectures. It catches resource lookup differences between Command Line Tools and Xcode SwiftPM builds that compilation and signature checks alone cannot detect.
+
 ## Real engine integration
 
 `./scripts/smoke-docker.sh --context colima --report docs/verification/live-smoke.json` passed against the environment above. The [sanitized machine-readable result](verification/live-smoke.json) records discovery, Compose grouping, inspection, engine information, image/volume/network listings, stats, stop, start, restart, log tail, and cancellable log following.

@@ -10,15 +10,52 @@ enum DockeyFonts {
     @MainActor
     private static var registered = false
 
+    // SwiftPM toolchains disagree about Bundle.module's lookup inside .app files.
+    // Packaged apps use the standard macOS Resources directory explicitly.
+    private static var fontDirectory: URL? {
+        if Bundle.main.bundleURL.pathExtension == "app" {
+            guard let resourceURL = Bundle.main.resourceURL,
+                let bundle = Bundle(url: resourceURL.appendingPathComponent("Dockey_Dockey.bundle"))
+            else { return nil }
+            return bundle.resourceURL?.appendingPathComponent("Resources/Fonts")
+        }
+        return Bundle.module.resourceURL?.appendingPathComponent("Resources/Fonts")
+    }
+
     @MainActor
     static func register() {
         guard !registered else { return }
-        registered = true
-        guard let directory = Bundle.module.resourceURL?.appendingPathComponent("Resources/Fonts"),
+        guard let directory = fontDirectory,
             let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
         else { return }
         for file in files where ["ttf", "otf"].contains(file.pathExtension.lowercased()) {
             CTFontManagerRegisterFontsForURL(file as CFURL, .process, nil)
+        }
+        registered = true
+    }
+
+    @MainActor
+    static func verifyBundledFonts() throws {
+        let fonts = [
+            ("Geist-Regular.ttf", "Geist-Regular"),
+            ("Geist-Medium.ttf", "Geist-Medium"),
+            ("Geist-Semibold.ttf", "Geist-SemiBold"),
+            ("GeistMono-Regular.ttf", "GeistMono-Regular"),
+        ]
+        guard Bundle.main.bundleURL.pathExtension == "app", let directory = fontDirectory,
+            fonts.allSatisfy({ FileManager.default.fileExists(atPath: directory.appendingPathComponent($0.0).path) })
+        else { throw CocoaError(.fileReadNoSuchFile) }
+        let notices =
+            [directory.appendingPathComponent("Geist-OFL.txt"), directory.appendingPathComponent("GeistMono-OFL.txt")]
+            + ["Apache-2.0.txt", "THIRD_PARTY_NOTICES.md"].compactMap {
+                Bundle.main.resourceURL?.appendingPathComponent("Licenses/\($0)")
+            }
+        guard notices.count == 4, notices.allSatisfy({ (try? Data(contentsOf: $0).isEmpty) == false }) else {
+            throw CocoaError(.fileReadNoSuchFile)
+        }
+        register()
+        guard fonts.allSatisfy({ NSFont(name: $0.1, size: 12)?.fontName == $0.1 }) else {
+            throw CocoaError(.fileReadCorruptFile)
         }
     }
 

@@ -89,10 +89,13 @@ The uninstaller checks the bundle identity and refuses unrelated apps or symboli
 ```sh
 ./scripts/check.sh
 ./scripts/build-app.sh
+./scripts/check-app-launch.sh
 open dist/Dockey.app --args --demo
 ```
 
 `check.sh` runs the Swift Testing suite through `scripts/test.sh` and disposable installation/archive checks. The wrapper works with Command Line Tools installations that do not include XCTest and explicitly loads the selected toolchain's Swift Testing macro plugin when needed. The installer tests use an isolated signed fixture app, not your installed copy or Docker resources. CI runs on Apple Silicon and Intel macOS runners and produces app ZIPs and checksums.
+
+`check-app-launch.sh` exercises a temporary copy of the actual `.app` in a macOS graphical session. It first proves a missing bundled font is rejected, then verifies bundled fonts/licenses and a native demo screenshot with a bounded launch timeout. CI runs this check on both architectures before packaging; a successful compile alone is not a successful installed-app test. The check never connects to Docker.
 
 For an opt-in live integration check against your existing local engine:
 

@@ -54,6 +54,10 @@ jobs:
           else
             ./scripts/build-app.sh
           fi
+      # Launch the copied .app, not just the development executable. This catches
+      # resource lookup differences between SwiftPM/Xcode and CLT toolchains.
+      - name: Verify standalone app launch and bundled resources
+        run: ./scripts/check-app-launch.sh
       - name: Package app and checksum
         run: ./scripts/package-release.sh
       - name: Upload locally signed build

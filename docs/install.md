@@ -30,6 +30,7 @@ Build without installing:
 
 ```sh
 ./scripts/build-app.sh
+./scripts/check-app-launch.sh
 open dist/Dockey.app
 ```
 
@@ -40,6 +41,8 @@ Choose a destination or an already-built app:
 ```
 
 The destination is a directory; the final app is always named `Dockey.app`. The scripts refuse to overwrite a symlink, a non-Dockey bundle, or an app running from that exact target path. Quit the installed copy before updating it.
+
+The native launch check requires a macOS graphical session and Python 3, available with the development tools used for source builds. It copies the app into a temporary directory, verifies bundle-contained resources and a demo screenshot, and removes only those temporary copies. To check a downloaded/extracted bundle, use `./scripts/check-app-launch.sh --app /path/to/Dockey.app`. The default per-launch limit is 30 seconds; `--timeout SECONDS` can adjust it.
 
 ## Release ZIPs and Gatekeeper
 
@@ -106,11 +109,12 @@ Optional preference removal:
 
 ```sh
 ./scripts/build-app.sh --version 0.1.0
+./scripts/check-app-launch.sh
 ./scripts/package-release.sh
 ```
 
 To build a single non-default architecture, pass `--arch arm64` or `--arch x86_64` to `build-app.sh`. The archive name is derived from the actual Mach-O executable, not a manually supplied label.
 
-The CI version-tag workflow builds and tests both architectures before a separate publishing job verifies the checksums and creates a prerelease. Add `docs/releases/vVERSION.md` before pushing a version tag. This does not change the signing status of the artifacts.
+The CI version-tag workflow builds and tests both architectures, including launching the actual copied app and validating its resources/demo PNG, before a separate publishing job verifies the checksums and creates a prerelease. Add `docs/releases/vVERSION.md` before pushing a version tag. This does not change the signing status of the artifacts.
 
 For an established Developer ID release, build with `--sign "Developer ID Application: ..."`, then submit the archive to Apple's notary service and staple the approved ticket before publication. The script enables hardened runtime and timestamping for a real identity; it does not create certificates, access a developer account, or claim notarization. Configure credentials outside the repository, and reverify the final app and checksum after any signing/stapling change. [Apple's notarization documentation](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution) describes the required account setup and commands.
