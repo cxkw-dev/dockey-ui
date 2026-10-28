@@ -48,6 +48,12 @@ struct GroupedContainerList: View {
                     .accessibilityIdentifier("container-list")
                 }
             }
+            .preference(
+                key: DockeyMetricsVisibilityKey.self,
+                value: metricsVisible
+                    && store.groups.contains { group in
+                        isExpanded(group) && group.containers.contains(where: \.isRunning)
+                    })
         }
     }
 
@@ -71,10 +77,11 @@ struct GroupedContainerList: View {
             .padding(.horizontal, 10).frame(maxWidth: 330).frame(height: 31)
             .background(palette.background, in: RoundedRectangle(cornerRadius: 6))
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(palette.border))
-            Picker("State", selection: $store.stateFilter) {
-                ForEach(ContainerFilter.allCases) { filter in Text(filter.label).tag(filter) }
-            }
-            .labelsHidden().frame(width: 120).controlSize(.small)
+            DockeySelect(
+                title: "Container state", selection: $store.stateFilter,
+                options: ContainerFilter.allCases.map { .init(value: $0, title: $0.label) }
+            )
+            .frame(width: 120)
             Toggle(
                 isOn: Binding(
                     get: { store.preferences.showStopped },
@@ -83,7 +90,7 @@ struct GroupedContainerList: View {
                         store.savePreferences()
                     })
             ) { Text("Show stopped").font(DockeyFonts.ui(11)) }
-            .toggleStyle(.checkbox)
+            .toggleStyle(DockeyCheckboxStyle())
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 26).padding(.bottom, 18)
@@ -164,7 +171,8 @@ struct GroupedContainerList: View {
             } label: {
                 Image(systemName: "ellipsis").frame(width: 22, height: 24)
             }
-            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).fixedSize()
+            .tint(palette.muted).foregroundStyle(palette.muted)
             .disabled(pending || !store.isConnected)
             .help(
                 "Controls all \(completeGroup.containers.count) existing containers in \(group.name), including filtered rows; does not apply Compose configuration"
@@ -197,7 +205,7 @@ private struct ContainerTableRow: View {
                 store.selectContainer(container)
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "shippingbox").font(.system(size: 14)).foregroundStyle(palette.muted)
+                    ServiceIcon(identity: ServiceIdentity(imageReference: container.image))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(container.name).font(DockeyFonts.ui(12, weight: .medium)).foregroundStyle(palette.primary)
                             .lineLimit(1)
@@ -279,7 +287,8 @@ private struct ContainerTableRow: View {
                 }
                 .foregroundStyle(palette.blue)
             }
-            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).fixedSize()
+            .tint(palette.blue)
             .help(container.ports.map(\.display).joined(separator: "\n"))
             .accessibilityLabel("Published ports for \(container.name)")
         } else {

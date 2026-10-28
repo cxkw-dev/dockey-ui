@@ -42,7 +42,7 @@ Choose a destination or an already-built app:
 
 The destination is a directory; the final app is always named `Dockey.app`. The scripts refuse to overwrite a symlink, a non-Dockey bundle, or an app running from that exact target path. Quit the installed copy before updating it.
 
-The native launch check requires a macOS graphical session and Python 3, available with the development tools used for source builds. It copies the app into a temporary directory, verifies bundle-contained resources and a demo screenshot, and removes only those temporary copies. To check a downloaded/extracted bundle, use `./scripts/check-app-launch.sh --app /path/to/Dockey.app`. The default per-launch limit is 30 seconds; `--timeout SECONDS` can adjust it.
+The native launch check requires a macOS graphical session and Python 3, available with the development tools used for source builds. It creates temporary copies with both flat SwiftPM and wrapped SwiftBuild resource bundles and re-signs the copies. Each layout must reject a missing font, verify intact resources, and export a readable demo screenshot. Only temporary copies are modified and removed. To check a downloaded/extracted bundle, use `./scripts/check-app-launch.sh --app /path/to/Dockey.app`. The default per-launch limit is 30 seconds; `--timeout SECONDS` can adjust it.
 
 ## Release ZIPs and Gatekeeper
 

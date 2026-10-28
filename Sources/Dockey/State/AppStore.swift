@@ -14,7 +14,9 @@ final class AppStore: ObservableObject {
     @Published var engineInfo: EngineInfo?
     @Published var selectedContext = "" {
         didSet {
-            if oldValue != selectedContext, started { invalidateConnection() }
+            if oldValue != selectedContext, started {
+                invalidateConnection(cancelRefresh: !selectingDiscoveredContext)
+            }
         }
     }
     @Published var selectedSection: AppSection = .containers
@@ -23,6 +25,9 @@ final class AppStore: ObservableObject {
     @Published var stateFilter: ContainerFilter = .all
     @Published var expandedGroupIDs: Set<String> = []
     @Published var isRefreshing = false
+    @Published private var loadingResourceSections: Set<String> = []
+    @Published private(set) var liveUpdateError: String?
+    @Published private(set) var metricsError: String?
     @Published var connectionError: String?
     @Published var operationError: String?
     @Published var pendingContainerIDs: Set<String> = []
@@ -36,9 +41,32 @@ final class AppStore: ObservableObject {
 
     private var client: DockerClient?
     private var started = false
-    private var refreshAgain = false
     private var loadedContext = ""
-    private var refreshLoop: Task<Void, Never>?
+    private var snapshotTask: Task<Void, Never>?
+    private var snapshotRequestID: UUID?
+    private var followUpSnapshot = false
+    private var forceMetadataOnNextPass = false
+    private var currentPassForcesMetadata = false
+    private var selectingDiscoveredContext = false
+    private var statsTask: Task<Void, Never>?
+    private var statsRequestID: UUID?
+    private var statsPublicationTask: Task<Void, Never>?
+    private var pendingStats: [String: ContainerStats] = [:]
+    private var eventsTask: Task<Void, Never>?
+    private var eventsRequestID: UUID?
+    private var eventReconciliationTask: Task<Void, Never>?
+    private var inventoryInvalidated = false
+    private var resourcesInvalidated: Set<String> = []
+    private var isApplicationActive = false
+    private var areMetricsVisible = false
+    private var engineInfoTask: Task<Void, Never>?
+    private var resourceTasks: [String: Task<Void, Never>] = [:]
+    private var resourceRequestIDs: [String: UUID] = [:]
+    private var resourceInvalidationVersions: [String: UInt64] = [:]
+    private let clock = ContinuousClock()
+    private var contextsFetchedAt: ContinuousClock.Instant?
+    private var engineInfoFetchedAt: ContinuousClock.Instant?
+    private var resourcesFetchedAt: [String: ContinuousClock.Instant] = [:]
     private var logTask: Task<Void, Never>?
     private var detailTask: Task<Void, Never>?
     private var inspectionTask: Task<ContainerInspection, Error>?
@@ -81,6 +109,7 @@ final class AppStore: ObservableObject {
     var runningCount: Int { containers.filter(\.isRunning).count }
     var unhealthyCount: Int { containers.filter(\.isUnhealthy).count }
     var isConnected: Bool { connected && connectionError == nil && loadedContext == selectedContext }
+    var isLoadingResources: Bool { loadingResourceSections.contains(selectedSection.rawValue) }
 
     var groups: [ContainerGroup] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -123,136 +152,429 @@ final class AppStore: ObservableObject {
             return
         }
         await refresh()
-        refreshLoop = Task { [weak self] in
-            while !Task.isCancelled {
-                let interval = self?.preferences.refreshInterval ?? 5
-                do { try await Task.sleep(for: .seconds(interval)) } catch { break }
-                guard !Task.isCancelled else { break }
-                await self?.refresh()
-            }
-        }
     }
 
     func refresh() async {
+        await requestSnapshot(explicit: true)
+    }
+
+    /// Reconcile an invalidated snapshot without replacing cached rows with a global busy state.
+    func refreshInBackground() async {
+        await requestSnapshot(explicit: false)
+    }
+
+    private func requestSnapshot(explicit: Bool, afterInvalidation: Bool = false) async {
         guard !isDemo, !isShuttingDown else { return }
-        guard !isRefreshing else {
-            refreshAgain = true
+        if let snapshotTask {
+            if explicit {
+                isRefreshing = true
+                if !currentPassForcesMetadata { forceMetadataOnNextPass = true }
+            }
+            // A command may finish after this pass began. Read once more before calling it current.
+            if afterInvalidation { followUpSnapshot = true }
+            await snapshotTask.value
             return
         }
         guard let client else { return }
-        isRefreshing = true
-        defer {
-            isRefreshing = false
-            if refreshAgain, !isShuttingDown {
-                refreshAgain = false
-                Task { [weak self] in await self?.refresh() }
+        let requestID = UUID()
+        snapshotRequestID = requestID
+        forceMetadataOnNextPass = explicit
+        let showsProgress = explicit || loadedContext.isEmpty || loadedContext != selectedContext
+        if isRefreshing != showsProgress { isRefreshing = showsProgress }
+        let task = Task { [weak self] in
+            guard let self else { return }
+            repeat {
+                guard self.snapshotRequestID == requestID, !Task.isCancelled, !self.isShuttingDown else { break }
+                let forceMetadata = self.forceMetadataOnNextPass
+                self.forceMetadataOnNextPass = false
+                self.currentPassForcesMetadata = forceMetadata
+                self.followUpSnapshot = false
+                await self.refreshSnapshot(client: client, requestID: requestID, forceMetadata: forceMetadata)
+                guard self.snapshotRequestID == requestID else { return }
+            } while self.followUpSnapshot || self.forceMetadataOnNextPass
+            if self.snapshotRequestID == requestID {
+                self.snapshotTask = nil
+                self.snapshotRequestID = nil
+                self.currentPassForcesMetadata = false
+                if self.isRefreshing { self.isRefreshing = false }
             }
         }
+        snapshotTask = task
+        await task.value
+    }
+
+    private func refreshSnapshot(client: DockerClient, requestID: UUID, forceMetadata: Bool) async {
         var generation = configurationGeneration
+        let snapshotBeganAt = Date()
         do {
-            let discovered = try await client.contexts()
-            guard generation == configurationGeneration, !isShuttingDown else {
-                refreshAgain = true
-                return
+            if forceMetadata || !isRecent(contextsFetchedAt, seconds: 30) {
+                let discovered = try await client.contexts()
+                guard generation == configurationGeneration, snapshotRequestID == requestID,
+                    !Task.isCancelled, !isShuttingDown
+                else { return }
+                if contexts != discovered { contexts = discovered }
+                let local = discovered.filter(\.isLocal)
+                if !local.contains(where: { $0.name == selectedContext }) {
+                    selectingDiscoveredContext = true
+                    selectedContext =
+                        local.first(where: { $0.name == "colima" })?.name ?? local.first(where: \.isCurrent)?.name
+                        ?? local.first?.name ?? ""
+                    selectingDiscoveredContext = false
+                }
+                contextsFetchedAt = clock.now
             }
-            contexts = discovered
-            let local = discovered.filter(\.isLocal)
-            if !local.contains(where: { $0.name == selectedContext }) {
-                selectedContext =
-                    local.first(where: { $0.name == "colima" })?.name ?? local.first(where: \.isCurrent)?.name ?? local
-                    .first?.name ?? ""
-            }
+            generation = configurationGeneration
             guard !selectedContext.isEmpty else {
                 throw DockerError.commandFailed(
                     "No local Docker context was found. Configure a local engine such as Colima, then refresh.")
             }
             let context = selectedContext
-            generation = configurationGeneration
-            if loadedContext != context {
-                closeDetail()
-                containers = []
-                stats = [:]
-                images = []
-                volumes = []
-                networks = []
-                engineInfo = nil
-                connected = false
-                loadedContext = context
-            }
-            async let fetchedContainers = client.containers(context: context)
-            async let fetchedInfo = client.engineInfo(context: context)
-            let (fresh, info) = try await (fetchedContainers, fetchedInfo)
-            guard context == selectedContext, generation == configurationGeneration, !isShuttingDown else {
-                refreshAgain = true
-                return
-            }
+            observeEngine(client: client, context: context, generation: generation, since: snapshotBeganAt)
+            let fresh = try await client.containers(context: context)
+            guard scopeMatches(context, generation: generation), snapshotRequestID == requestID,
+                !Task.isCancelled
+            else { return }
             let previous = Set(ContainerGrouping.groups(containers: containers, context: context).map(\.id))
-            containers = fresh
-            engineInfo = info
-            connectionError = nil
-            if !connected { addActivity("Connected to local context \(context).") }
-            connected = true
-            expandNewGroups(previous: previous)
-            defaults.set(context, forKey: contextKey)
-            if let selectedContainerID, !fresh.contains(where: { $0.id == selectedContainerID }) { closeDetail() }
-            do {
-                let values = try await client.stats(context: context)
-                if selectedContext == context, generation == configurationGeneration {
-                    stats = Dictionary(values.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-                }
-            } catch {
-                if selectedContext == context, generation == configurationGeneration { stats = [:] }
+            // Avoid invalidating the entire SwiftUI list for an unchanged reconciliation result.
+            if containers != fresh { containers = fresh }
+            loadedContext = context
+            if connectionError != nil { connectionError = nil }
+            if !connected {
+                addActivity("Connected to local context \(context).")
+                connected = true
             }
-            await refreshResources(client: client, context: context, generation: generation)
+            expandNewGroups(previous: previous)
+            if defaults.string(forKey: contextKey) != context { defaults.set(context, forKey: contextKey) }
+            if let selectedContainerID, !fresh.contains(where: { $0.id == selectedContainerID }) { closeDetail() }
+            let activeIDs = Set(fresh.filter { [.running, .paused, .restarting].contains($0.state) }.map(\.id))
+            let validStats = stats.filter { activeIDs.contains($0.key) }
+            if validStats != stats { stats = validStats }
+            refreshEngineInfo(client: client, context: context, generation: generation, force: forceMetadata)
+            updateStatsSubscription()
+            await refreshResources(
+                selectedSection, client: client, context: context, generation: generation,
+                force: forceMetadata, reportErrors: forceMetadata)
         } catch is CancellationError {
             return
         } catch {
-            guard generation == configurationGeneration, !isShuttingDown else {
-                refreshAgain = true
-                return
-            }
+            guard generation == configurationGeneration, snapshotRequestID == requestID,
+                !Task.isCancelled, !isShuttingDown
+            else { return }
             let message = error.localizedDescription
             if connectionError != message { addActivity("Connection unavailable: \(message)", isError: true) }
             connectionError = message
             connected = false
             stats = [:]
+            stopStatsSubscription()
             logTask?.cancel()
         }
     }
 
-    private func refreshResources(client: DockerClient, context: String, generation: Int) async {
-        guard selectedContext == context, generation == configurationGeneration, !isShuttingDown else { return }
-        do {
-            switch selectedSection {
-            case .images:
-                let result = try await client.images(context: context)
-                if selectedContext == context, generation == configurationGeneration { images = result }
-            case .volumes:
-                let result = try await client.volumes(context: context)
-                if selectedContext == context, generation == configurationGeneration { volumes = result }
-            case .networks:
-                let result = try await client.networks(context: context)
-                if selectedContext == context, generation == configurationGeneration { networks = result }
-            default: break
+    private func scopeMatches(_ context: String, generation: Int) -> Bool {
+        selectedContext == context && configurationGeneration == generation && !isShuttingDown
+    }
+
+    private func isRecent(_ timestamp: ContinuousClock.Instant?, seconds: Double) -> Bool {
+        guard let timestamp else { return false }
+        return timestamp.duration(to: clock.now) < .seconds(seconds)
+    }
+
+    private func refreshEngineInfo(client: DockerClient, context: String, generation: Int, force: Bool) {
+        guard engineInfoTask == nil, force || !isRecent(engineInfoFetchedAt, seconds: 60) else { return }
+        // Throttle failed metadata reads too; container discovery remains the connection authority.
+        engineInfoFetchedAt = clock.now
+        engineInfoTask = Task { [weak self] in
+            defer {
+                if let self, self.scopeMatches(context, generation: generation) { self.engineInfoTask = nil }
             }
-        } catch {
-            if selectedContext == context, generation == configurationGeneration {
-                operationError = error.localizedDescription
+            do {
+                let value = try await client.engineInfo(context: context)
+                guard let self, self.scopeMatches(context, generation: generation), !Task.isCancelled else { return }
+                if self.engineInfo != value { self.engineInfo = value }
+            } catch {}
+        }
+    }
+
+    func setApplicationActive(_ active: Bool) {
+        guard isApplicationActive != active else { return }
+        isApplicationActive = active
+        updateStatsSubscription()
+        // A user returning to a disconnected workspace may have installed or started an engine.
+        if active, started, !isDemo, eventsTask == nil {
+            Task { [weak self] in await self?.refreshInBackground() }
+        }
+    }
+
+    func setMetricsVisible(_ visible: Bool) {
+        guard areMetricsVisible != visible else { return }
+        areMetricsVisible = visible
+        updateStatsSubscription()
+    }
+
+    private func observeEngine(client: DockerClient, context: String, generation: Int, since initialSince: Date) {
+        guard eventsTask == nil, scopeMatches(context, generation: generation) else { return }
+        let requestID = UUID()
+        eventsRequestID = requestID
+        eventsTask = Task { [weak self] in
+            var delay = 1.0
+            var since = initialSince
+            while !Task.isCancelled {
+                guard let self, self.scopeMatches(context, generation: generation),
+                    self.eventsRequestID == requestID
+                else { return }
+                let openedAt = self.clock.now
+                let stream = await client.events(context: context, since: since)
+                guard !Task.isCancelled, self.scopeMatches(context, generation: generation),
+                    self.eventsRequestID == requestID
+                else { return }
+                // Reconcile once after every subscription opens, including reconnects, to cover gaps.
+                await self.requestSnapshot(explicit: false, afterInvalidation: true)
+                if self.isConnected, self.liveUpdateError != nil { self.liveUpdateError = nil }
+                do {
+                    for try await event in stream {
+                        guard !Task.isCancelled, self.scopeMatches(context, generation: generation),
+                            self.eventsRequestID == requestID
+                        else { return }
+                        delay = 1
+                        if self.liveUpdateError != nil { self.liveUpdateError = nil }
+                        self.receiveEngineEvent(event, client: client, context: context, generation: generation)
+                    }
+                    guard !Task.isCancelled else { return }
+                    self.liveUpdateError = "Live engine updates disconnected. Reconnecting…"
+                } catch {
+                    guard !Task.isCancelled, self.scopeMatches(context, generation: generation),
+                        self.eventsRequestID == requestID
+                    else { return }
+                    let message = "Live engine updates interrupted: \(error.localizedDescription)"
+                    if self.liveUpdateError != message { self.liveUpdateError = message }
+                }
+                if openedAt.duration(to: self.clock.now) >= .seconds(30) { delay = 1 }
+                do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+                delay = min(delay * 2, 30)
+                since = Date()
             }
+        }
+    }
+
+    private func receiveEngineEvent(_ event: DockerEvent, client: DockerClient, context: String, generation: Int) {
+        switch event.type.lowercased() {
+        case "container":
+            let action = event.action.lowercased()
+            let lifecycle: Set<String> = [
+                "create", "start", "stop", "die", "destroy", "pause", "unpause", "restart", "rename", "update", "oom",
+                "kill",
+            ]
+            guard lifecycle.contains(action) || action.hasPrefix("health_status") else { return }
+            inventoryInvalidated = true
+        case "image": resourcesInvalidated.insert(AppSection.images.rawValue)
+        case "volume": resourcesInvalidated.insert(AppSection.volumes.rawValue)
+        case "network":
+            resourcesInvalidated.insert(AppSection.networks.rawValue)
+            if ["connect", "disconnect"].contains(event.action.lowercased()) { inventoryInvalidated = true }
+        case "daemon":
+            inventoryInvalidated = true
+            engineInfoFetchedAt = nil
+            resourcesInvalidated.formUnion([
+                AppSection.images.rawValue, AppSection.volumes.rawValue, AppSection.networks.rawValue,
+            ])
+        default: return
+        }
+        for key in resourcesInvalidated {
+            resourcesFetchedAt[key] = nil
+            resourceInvalidationVersions[key, default: 0] &+= 1
+        }
+        guard eventReconciliationTask == nil else { return }
+        // One bounded coalescing window per event burst; idle engines execute no reconciliation work.
+        eventReconciliationTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
+            guard let self, self.scopeMatches(context, generation: generation), !Task.isCancelled else { return }
+            self.eventReconciliationTask = nil
+            let needsInventory = self.inventoryInvalidated
+            let resources = self.resourcesInvalidated
+            self.inventoryInvalidated = false
+            self.resourcesInvalidated.removeAll()
+            if needsInventory { await self.requestSnapshot(explicit: false, afterInvalidation: true) }
+            guard self.scopeMatches(context, generation: generation), !Task.isCancelled else { return }
+            if resources.contains(self.selectedSection.rawValue) {
+                await self.refreshResources(
+                    self.selectedSection, client: client, context: context, generation: generation,
+                    force: false, reportErrors: false)
+            }
+        }
+    }
+
+    private func updateStatsSubscription() {
+        guard !isDemo, !isShuttingDown, isApplicationActive, areMetricsVisible, isConnected,
+            containers.contains(where: { [.running, .paused, .restarting].contains($0.state) }), let client
+        else {
+            stopStatsSubscription()
+            return
+        }
+        guard statsTask == nil else { return }
+        let context = selectedContext
+        let generation = configurationGeneration
+        let requestID = UUID()
+        statsRequestID = requestID
+        statsTask = Task { [weak self] in
+            var delay = 1.0
+            while !Task.isCancelled {
+                guard let self, self.scopeMatches(context, generation: generation), self.statsRequestID == requestID
+                else {
+                    return
+                }
+                let openedAt = self.clock.now
+                let stream = await client.statsStream(context: context)
+                do {
+                    for try await value in stream {
+                        guard !Task.isCancelled, self.scopeMatches(context, generation: generation),
+                            self.statsRequestID == requestID
+                        else { return }
+                        delay = 1
+                        if self.metricsError != nil { self.metricsError = nil }
+                        guard
+                            self.containers.contains(where: {
+                                $0.id == value.id && [.running, .paused, .restarting].contains($0.state)
+                            })
+                        else {
+                            continue
+                        }
+                        self.pendingStats[value.id] = value
+                        self.publishStatsWhenReady(context: context, generation: generation, requestID: requestID)
+                    }
+                    guard !Task.isCancelled else { return }
+                    self.metricsError = "Live metrics disconnected. Reconnecting…"
+                } catch {
+                    guard !Task.isCancelled, self.scopeMatches(context, generation: generation),
+                        self.statsRequestID == requestID
+                    else { return }
+                    let message = "Live metrics interrupted: \(error.localizedDescription)"
+                    if self.metricsError != message { self.metricsError = message }
+                }
+                if openedAt.duration(to: self.clock.now) >= .seconds(30) { delay = 1 }
+                do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+                delay = min(delay * 2, 30)
+            }
+        }
+    }
+
+    private func publishStatsWhenReady(context: String, generation: Int, requestID: UUID) {
+        guard statsPublicationTask == nil else { return }
+        statsPublicationTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
+            guard let self, self.scopeMatches(context, generation: generation), self.statsRequestID == requestID,
+                !Task.isCancelled
+            else { return }
+            self.statsPublicationTask = nil
+            let activeIDs = Set(
+                self.containers.filter { [.running, .paused, .restarting].contains($0.state) }.map(\.id))
+            var merged = self.stats.filter { activeIDs.contains($0.key) }
+            for (id, value) in self.pendingStats where activeIDs.contains(id) { merged[id] = value }
+            self.pendingStats.removeAll(keepingCapacity: true)
+            if self.stats != merged { self.stats = merged }
+        }
+    }
+
+    private func stopStatsSubscription() {
+        statsTask?.cancel()
+        statsTask = nil
+        statsRequestID = nil
+        statsPublicationTask?.cancel()
+        statsPublicationTask = nil
+        pendingStats.removeAll(keepingCapacity: true)
+        if metricsError != nil { metricsError = nil }
+    }
+
+    private func refreshResources(
+        _ section: AppSection, client: DockerClient, context: String, generation: Int, force: Bool,
+        reportErrors: Bool
+    ) async {
+        guard [.images, .volumes, .networks].contains(section), scopeMatches(context, generation: generation) else {
+            return
+        }
+        let key = section.rawValue
+        if let task = resourceTasks[key] {
+            await task.value
+            return
+        }
+        guard force || !isRecent(resourcesFetchedAt[key], seconds: 15) else { return }
+        let requestID = UUID()
+        let invalidationVersion = resourceInvalidationVersions[key, default: 0]
+        resourceRequestIDs[key] = requestID
+        loadingResourceSections.insert(key)
+        resourcesFetchedAt[key] = clock.now
+        let task = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if self.resourceRequestIDs[key] == requestID {
+                    self.resourceTasks[key] = nil
+                    self.resourceRequestIDs[key] = nil
+                    self.loadingResourceSections.remove(key)
+                }
+            }
+            do {
+                switch section {
+                case .images:
+                    let result = try await client.images(context: context)
+                    if self.scopeMatches(context, generation: generation), !Task.isCancelled,
+                        self.images != result
+                    {
+                        self.images = result
+                    }
+                case .volumes:
+                    let result = try await client.volumes(context: context)
+                    if self.scopeMatches(context, generation: generation), !Task.isCancelled,
+                        self.volumes != result
+                    {
+                        self.volumes = result
+                    }
+                case .networks:
+                    let result = try await client.networks(context: context)
+                    if self.scopeMatches(context, generation: generation), !Task.isCancelled,
+                        self.networks != result
+                    {
+                        self.networks = result
+                    }
+                default: break
+                }
+            } catch {
+                if reportErrors, self.scopeMatches(context, generation: generation), !Task.isCancelled {
+                    self.operationError = error.localizedDescription
+                }
+            }
+        }
+        resourceTasks[key] = task
+        await task.value
+        // A resource event arriving during the read requires one newer result, not a stale cache hit.
+        if scopeMatches(context, generation: generation), !Task.isCancelled,
+            resourceInvalidationVersions[key, default: 0] != invalidationVersion
+        {
+            await refreshResources(
+                section, client: client, context: context, generation: generation, force: true,
+                reportErrors: reportErrors)
         }
     }
 
     private func expandNewGroups(previous: Set<String>) {
         let ids = Set(ContainerGrouping.groups(containers: containers, context: selectedContext).map(\.id))
-        expandedGroupIDs.formIntersection(ids)
-        expandedGroupIDs.formUnion(ids.subtracting(previous))
+        let updated = expandedGroupIDs.intersection(ids).union(ids.subtracting(previous))
+        if expandedGroupIDs != updated { expandedGroupIDs = updated }
     }
 
     func selectSection(_ section: AppSection) {
         selectedSection = section
         searchText = ""
         closeDetail()
-        if !isDemo { Task { [weak self] in await self?.refresh() } }
+        guard !isDemo, !isShuttingDown else { return }
+        guard isConnected, let client else {
+            Task { [weak self] in await self?.refreshInBackground() }
+            return
+        }
+        let context = selectedContext
+        let generation = configurationGeneration
+        Task { [weak self] in
+            await self?.refreshResources(
+                section, client: client, context: context, generation: generation, force: false, reportErrors: true)
+        }
     }
 
     func selectContainer(_ container: DockerContainer) {
@@ -288,7 +610,13 @@ final class AppStore: ObservableObject {
             operationError = "Wait for the selected engine to finish connecting before controlling containers."
             return
         }
-        let eligible = selected.filter { container in
+        let requestedIDs = Set(selected.map(\.id))
+        let currentSelection = containers.filter { requestedIDs.contains($0.id) }
+        guard currentSelection.count == requestedIDs.count else {
+            operationError = "The selected containers changed. Refresh and select them again before continuing."
+            return
+        }
+        let eligible = currentSelection.filter { container in
             guard !pendingContainerIDs.contains(container.id) else { return false }
             switch action {
             case .start: return [.created, .exited].contains(container.state)
@@ -351,7 +679,7 @@ final class AppStore: ObservableObject {
                         "\(context): \(failed.count) of \(report.results.count) operations failed. "
                         + failed.map(\.message).joined(separator: "\n")
                 }
-                await self.refresh()
+                await self.requestSnapshot(explicit: false, afterInvalidation: true)
             } catch {
                 guard !Task.isCancelled, !self.isShuttingDown else { return }
                 self.operationError = "\(context): \(error.localizedDescription)"
@@ -454,8 +782,36 @@ final class AppStore: ObservableObject {
     }
     private var currentExecutablePath = ""
 
-    private func invalidateConnection() {
+    private func invalidateConnection(cancelRefresh: Bool = true) {
         configurationGeneration &+= 1
+        if cancelRefresh {
+            snapshotTask?.cancel()
+            snapshotTask = nil
+            snapshotRequestID = nil
+            followUpSnapshot = false
+            forceMetadataOnNextPass = false
+            currentPassForcesMetadata = false
+            if isRefreshing { isRefreshing = false }
+        }
+        eventsTask?.cancel()
+        eventsTask = nil
+        eventsRequestID = nil
+        eventReconciliationTask?.cancel()
+        eventReconciliationTask = nil
+        inventoryInvalidated = false
+        resourcesInvalidated.removeAll()
+        liveUpdateError = nil
+        stopStatsSubscription()
+        engineInfoTask?.cancel()
+        engineInfoTask = nil
+        for task in resourceTasks.values { task.cancel() }
+        resourceTasks.removeAll()
+        resourceRequestIDs.removeAll()
+        resourceInvalidationVersions.removeAll()
+        loadingResourceSections.removeAll()
+        contextsFetchedAt = nil
+        engineInfoFetchedAt = nil
+        resourcesFetchedAt.removeAll()
         connected = false
         loadedContext = ""
         connectionError = nil
@@ -480,7 +836,12 @@ final class AppStore: ObservableObject {
 
     func shutdown() {
         isShuttingDown = true
-        refreshLoop?.cancel()
+        snapshotTask?.cancel()
+        eventsTask?.cancel()
+        eventReconciliationTask?.cancel()
+        stopStatsSubscription()
+        engineInfoTask?.cancel()
+        for task in resourceTasks.values { task.cancel() }
         closeDetail()
         for task in mutationTasks.values { task.cancel() }
         for client in mutationClients.values { client.cancelPendingCommands() }

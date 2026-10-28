@@ -12,7 +12,15 @@ struct ResourceListView: View {
     private var palette: DockeyPalette { DockeyPalette(scheme: scheme) }
 
     var body: some View {
-        if rows.isEmpty && !store.isRefreshing {
+        if rows.isEmpty && (store.isLoadingResources || store.isRefreshing) {
+            VStack(spacing: 12) {
+                ProgressView().controlSize(.small)
+                Text("Loading \(title.lowercased())…")
+                    .font(DockeyFonts.ui(12)).foregroundStyle(palette.muted)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityElement(children: .combine)
+        } else if rows.isEmpty {
             DockeyEmptyState(
                 title: "No \(title.lowercased()) found",
                 message: "Resources from the selected local engine appear here.", symbol: symbol)
@@ -21,9 +29,13 @@ struct ResourceListView: View {
                 LazyVStack(spacing: 0) {
                     ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                         HStack(spacing: 14) {
-                            Image(systemName: symbol).font(.system(size: 19, weight: .light)).foregroundStyle(
-                                palette.muted
-                            ).frame(width: 24)
+                            if let imageReference = row.imageReference {
+                                ServiceIcon(identity: ServiceIdentity(imageReference: imageReference))
+                            } else {
+                                Image(systemName: symbol).font(.system(size: 19, weight: .light)).foregroundStyle(
+                                    palette.muted
+                                ).frame(width: 24)
+                            }
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(row.name).font(DockeyFonts.ui(12, weight: .medium)).lineLimit(1)
                                 Text(row.detail).font(DockeyFonts.ui(10)).foregroundStyle(palette.muted).lineLimit(2)
@@ -62,7 +74,7 @@ struct ResourceListView: View {
             store.images.map {
                 ResourceRow(
                     id: $0.id, name: $0.displayName, detail: String($0.id.prefix(19)),
-                    metadata: "\($0.size) · \($0.createdSince)")
+                    metadata: "\($0.size) · \($0.createdSince)", imageReference: $0.displayName)
             }
         case .volumes:
             store.volumes.map { ResourceRow(id: $0.name, name: $0.name, detail: $0.mountpoint, metadata: $0.driver) }
@@ -95,4 +107,13 @@ private struct ResourceRow {
     let name: String
     let detail: String
     let metadata: String
+    let imageReference: String?
+
+    init(id: String, name: String, detail: String, metadata: String, imageReference: String? = nil) {
+        self.id = id
+        self.name = name
+        self.detail = detail
+        self.metadata = metadata
+        self.imageReference = imageReference
+    }
 }

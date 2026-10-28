@@ -11,6 +11,8 @@
     "fixture stop",
     "fixture start",
     "fixture restart",
+    "cancellable lifecycle event stream",
+    "cancellable persistent stats stream",
     "log tail",
     "cancellable log stream"
   ],

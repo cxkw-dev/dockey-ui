@@ -38,7 +38,6 @@ struct AppPreferences: Codable, Equatable {
     var appearance = "system"
     var density = "compact"
     var showStopped = true
-    var refreshInterval: Double = 5
     var stopTimeout = 10
     var logTail = 1000
     var logFontSize: Double = 12
@@ -50,7 +49,6 @@ struct AppPreferences: Codable, Equatable {
     mutating func normalize() {
         if !["system", "light", "dark"].contains(appearance) { appearance = "system" }
         if !["compact", "comfortable"].contains(density) { density = "compact" }
-        refreshInterval = refreshInterval.isFinite ? min(max(refreshInterval, 2), 60) : 5
         stopTimeout = min(max(stopTimeout, 1), 120)
         logTail = min(max(logTail, 100), 10_000)
         logFontSize = logFontSize.isFinite ? min(max(logFontSize, 10), 22) : 12

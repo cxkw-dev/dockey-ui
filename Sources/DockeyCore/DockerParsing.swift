@@ -89,6 +89,30 @@ enum DockerParsing {
         }
     }
 
+    static func event(_ line: String) throws -> DockerEvent {
+        let item = try object(line, operation: "Docker event")
+        let actor = item["Actor"] as? [String: Any]
+        guard let type = item["Type"] as? String, !type.isEmpty,
+            let action = (item["Action"] ?? item["status"]) as? String, !action.isEmpty,
+            let id = (actor?["ID"] ?? item["ID"] ?? item["id"]) as? String, !id.isEmpty
+        else { throw DockerError.invalidResponse("Docker event") }
+        let seconds: Double?
+        if let nanos = item["timeNano"] as? NSNumber {
+            seconds = nanos.doubleValue / 1_000_000_000
+        } else {
+            seconds = (item["time"] as? NSNumber)?.doubleValue
+        }
+        let timestamp = seconds.flatMap { $0.isFinite && $0 >= 0 ? Date(timeIntervalSince1970: $0) : nil }
+        return DockerEvent(type: type, action: action, actorID: id, timestamp: timestamp)
+    }
+
+    static func streamStats(_ line: String) throws -> ContainerStats {
+        guard let stat = try stats(line).first else {
+            throw DockerError.invalidResponse("container stats")
+        }
+        return stat
+    }
+
     static func inspection(_ text: String) throws -> ContainerInspection {
         guard let raw = try array(text, operation: "container inspection").first else {
             throw DockerError.invalidResponse("container inspection")

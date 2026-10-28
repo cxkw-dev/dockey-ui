@@ -55,6 +55,21 @@ struct DockeySmoke {
             "local context discovery", "container inspection and Compose grouping", "engine info", "images", "volumes",
             "networks", "resource stats",
         ]
+        let eventClient = DockerClient()
+        defer { eventClient.cancelPendingCommands() }
+        let eventTask = Task {
+            for try await event in await eventClient.events(context: context)
+            where event.actorID == id && event.action == "die" { return true }
+            return false
+        }
+        let eventTimeout = Task {
+            try await Task.sleep(for: .seconds(30))
+            eventTask.cancel()
+        }
+        defer {
+            eventTask.cancel()
+            eventTimeout.cancel()
+        }
         for action in [ContainerAction.stop, .start, .restart] {
             let result = try await client.perform(action, containerIDs: [id], context: context, stopTimeout: 2)
             guard result.succeeded else { throw SmokeError(result.results.map(\.message).joined(separator: "; ")) }
@@ -64,6 +79,31 @@ struct DockeySmoke {
             }
             passed.append("fixture \(action.rawValue)")
         }
+        guard try await eventTask.value else { throw SmokeError("Live lifecycle event was not received.") }
+        eventTimeout.cancel()
+        eventClient.cancelPendingCommands()
+        passed.append("cancellable lifecycle event stream")
+
+        let metricClient = DockerClient()
+        defer { metricClient.cancelPendingCommands() }
+        let metricTask = Task {
+            for try await sample in await metricClient.statsStream(context: context) where sample.id == id {
+                return sample.cpuPercent.isFinite && !sample.memoryUsage.isEmpty
+            }
+            return false
+        }
+        let metricTimeout = Task {
+            try await Task.sleep(for: .seconds(15))
+            metricTask.cancel()
+        }
+        defer {
+            metricTask.cancel()
+            metricTimeout.cancel()
+        }
+        guard try await metricTask.value else { throw SmokeError("Live resource metric was not received.") }
+        metricTimeout.cancel()
+        metricClient.cancelPendingCommands()
+        passed.append("cancellable persistent stats stream")
         let logs = try await client.logs(containerID: id, context: context, tail: 20)
         guard logs.contains("dockey-smoke-ready") else { throw SmokeError("Fixture log marker was missing.") }
         passed.append("log tail")

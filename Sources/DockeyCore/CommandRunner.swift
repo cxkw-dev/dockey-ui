@@ -7,14 +7,16 @@ public struct CommandRequest: Sendable, Equatable {
     public let arguments: [String]
     public let timeout: TimeInterval
     public let outputLimitBytes: Int
+    public let streamStderr: Bool
     public init(
         executableURL: URL, arguments: [String], timeout: TimeInterval = 20,
-        outputLimitBytes: Int = 8 * 1_024 * 1_024
+        outputLimitBytes: Int = 8 * 1_024 * 1_024, streamStderr: Bool = true
     ) {
         self.executableURL = executableURL
         self.arguments = arguments
         self.timeout = timeout
         self.outputLimitBytes = max(1_024, outputLimitBytes)
+        self.streamStderr = streamStderr
     }
 }
 
@@ -277,6 +279,9 @@ private final class ProcessSession: @unchecked Sendable {
                     // diagnostic tail for a failed CLI exit, rather than growing it forever.
                     stderr.append(data)
                     if stderr.count > 4_096 { stderr.removeFirst(stderr.count - 4_096) }
+                    // Structured streams decode stdout only; warnings and CLI diagnostics
+                    // stay in the bounded error tail instead of becoming JSON records.
+                    guard request.streamStderr else { return false }
                     pendingErrorLine.append(data)
                     if let end = pendingErrorLine.lastIndex(of: 10) {
                         text = String(decoding: pendingErrorLine[...end], as: UTF8.self)

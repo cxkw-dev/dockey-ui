@@ -76,6 +76,37 @@ struct CommandRunnerTests {
         #expect(output.stdout == value + "\n")
     }
 
+    @Test func structuredStreamsRetainDiagnosticsWithoutDecodingStderr() async throws {
+        var text = ""
+        for try await chunk in runner.stream(
+            CommandRequest(
+                executableURL: python,
+                arguments: ["-c", "import os; os.write(1,b'{}\\n'); os.write(2,b'fixture warning\\n')"],
+                timeout: 5, streamStderr: false))
+        { text += chunk }
+        #expect(text == "{}\n")
+        do {
+            for try await _ in runner.stream(
+                CommandRequest(
+                    executableURL: python,
+                    arguments: ["-c", "import sys; print('fixture failure',file=sys.stderr); sys.exit(1)"],
+                    timeout: 5, streamStderr: false))
+            {}
+            Issue.record("Nonzero structured stream exit was accepted")
+        } catch { #expect(error as? DockerError == .commandFailed("fixture failure\n")) }
+    }
+
+    @Test func streamLifetimeOutputIsNotCumulativelyLimited() async throws {
+        var count = 0
+        for try await chunk in runner.stream(
+            CommandRequest(
+                executableURL: python,
+                arguments: ["-c", "import os; os.write(1,b'fixture\\n'*4000)"],
+                timeout: 5, outputLimitBytes: 1_024, streamStderr: false))
+        { count += chunk.utf8.count }
+        #expect(count == 32_000)
+    }
+
     @Test func cancelAllTerminatesAnIdleStreamWithoutTouchingAnotherRunner() async throws {
         let owned = ProcessCommandRunner()
         let other = ProcessCommandRunner()

@@ -18,7 +18,7 @@ Source: `design-assets/dockey-mark.svg`. The identical prototype export is `prot
 
 Keep the mark small beside the name in the sidebar. A larger version can appear in About and the empty state. Resource icons and lifecycle controls retain the existing restrained SVG icon system.
 
-The macOS Dock icon uses a transparent canvas instead of a light tile, with a soft teal halo around the flat mascot. The glow keeps its silhouette visible on a dark Dock; the sidebar and source vector remain flat. The native icon renderer and bundled `AppIcon.icns` use the same artwork.
+The macOS Dock icon uses a matte charcoal tile and a larger mascot, with a soft teal halo around the flat figure. The tile gives the icon normal Dock presence and keeps its silhouette visible on dark backgrounds; the sidebar and source vector remain flat. The native icon renderer and bundled `AppIcon.icns` use the same artwork.
 
 [Dock icon PNG](../design-assets/dockey-dock-icon.png)
 

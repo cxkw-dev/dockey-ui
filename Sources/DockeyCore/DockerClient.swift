@@ -83,6 +83,91 @@ public actor DockerClient {
                 ], timeout: 12))
     }
 
+    /// Persistent local-engine lifecycle events. There is no idle timeout or inventory polling.
+    public func events(context: String, since: Date = Date()) async -> AsyncThrowingStream<DockerEvent, Error> {
+        do {
+            // Callers capture this before their reconciliation snapshot. Round down to
+            // replay the opening second as well as events during validation/startup.
+            let seconds = since.timeIntervalSince1970
+            guard seconds.isFinite, seconds >= 0, seconds < Double(Int.max) else {
+                throw DockerError.invalidResponse("event replay timestamp")
+            }
+            let replayStart = String(Int(seconds.rounded(.down)))
+            try await requireLocal(context)
+            try Task.checkCancellation()
+            let executable = try await resolvedExecutable()
+            let arguments = [
+                "--context", context, "events", "--since", replayStart,
+                "--filter", "type=container", "--filter", "type=image",
+                "--filter", "type=volume", "--filter", "type=network", "--format", "{{json .}}",
+            ]
+            return Self.decodedStream(
+                runner.stream(
+                    CommandRequest(
+                        executableURL: executable, arguments: arguments, timeout: 0, streamStderr: false)),
+                parse: DockerParsing.event)
+        } catch {
+            return AsyncThrowingStream { $0.finish(throwing: error) }
+        }
+    }
+
+    public func eventStream(context: String, since: Date = Date()) async -> AsyncThrowingStream<DockerEvent, Error> {
+        await events(context: context, since: since)
+    }
+
+    /// One persistent CLI connection yields individual metrics as Docker publishes them.
+    public func statsStream(context: String) async -> AsyncThrowingStream<ContainerStats, Error> {
+        do {
+            try await requireLocal(context)
+            try Task.checkCancellation()
+            let executable = try await resolvedExecutable()
+            return Self.decodedStream(
+                runner.stream(
+                    CommandRequest(
+                        executableURL: executable,
+                        arguments: [
+                            "--context", context, "container", "stats", "--all", "--no-trunc", "--format", "{{json .}}",
+                        ], timeout: 0, streamStderr: false)),
+                parse: DockerParsing.streamStats)
+        } catch {
+            return AsyncThrowingStream { $0.finish(throwing: error) }
+        }
+    }
+
+    private nonisolated static func decodedStream<Value: Sendable>(
+        _ source: AsyncThrowingStream<String, Error>,
+        parse: @escaping @Sendable (String) throws -> Value
+    ) -> AsyncThrowingStream<Value, Error> {
+        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(256)) { continuation in
+            let task = Task {
+                var framer = DockerStreamFramer()
+                do {
+                    for try await chunk in source {
+                        try Task.checkCancellation()
+                        for line in try framer.append(chunk) {
+                            switch continuation.yield(try parse(line)) {
+                            case .enqueued: break
+                            case .dropped: throw DockerError.outputLimitExceeded
+                            case .terminated: throw CancellationError()
+                            @unknown default: throw DockerError.outputLimitExceeded
+                            }
+                        }
+                    }
+                    for line in try framer.finish() {
+                        switch continuation.yield(try parse(line)) {
+                        case .enqueued: break
+                        case .dropped: throw DockerError.outputLimitExceeded
+                        case .terminated: throw CancellationError()
+                        @unknown default: throw DockerError.outputLimitExceeded
+                        }
+                    }
+                    continuation.finish()
+                } catch { continuation.finish(throwing: error) }
+            }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
+        }
+    }
+
     public func images(context: String) async throws -> [ImageSummary] {
         try await requireLocal(context)
         let output = try await raw(["--context", context, "image", "ls", "--no-trunc", "--format", "{{json .}}"])

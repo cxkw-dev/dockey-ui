@@ -13,13 +13,22 @@ enum DockeyFonts {
     // SwiftPM toolchains disagree about Bundle.module's lookup inside .app files.
     // Packaged apps use the standard macOS Resources directory explicitly.
     private static var fontDirectory: URL? {
+        let bundleURL: URL
         if Bundle.main.bundleURL.pathExtension == "app" {
-            guard let resourceURL = Bundle.main.resourceURL,
-                let bundle = Bundle(url: resourceURL.appendingPathComponent("Dockey_Dockey.bundle"))
-            else { return nil }
-            return bundle.resourceURL?.appendingPathComponent("Resources/Fonts")
+            guard let resourceURL = Bundle.main.resourceURL else { return nil }
+            bundleURL = resourceURL.appendingPathComponent("Dockey_Dockey.bundle")
+        } else {
+            bundleURL = Bundle.module.bundleURL
         }
-        return Bundle.module.resourceURL?.appendingPathComponent("Resources/Fonts")
+        // Native SwiftPM emits a flat bundle; SwiftBuild emits a wrapped bundle.
+        // Bundle.resourceURL may already enter the flat bundle's Resources folder.
+        return ["Contents/Resources/Resources/Fonts", "Resources/Fonts"]
+            .map { bundleURL.appendingPathComponent($0, isDirectory: true) }
+            .first { candidate in
+                var directory: ObjCBool = false
+                return FileManager.default.fileExists(atPath: candidate.path, isDirectory: &directory)
+                    && directory.boolValue
+            }
     }
 
     @MainActor
@@ -78,6 +87,7 @@ struct DockeyPalette {
     var secondary: Color { Color(hex: dark ? 0x111111 : 0xFAFAFA) }
     var hover: Color { Color(hex: dark ? 0x1A1A1A : 0xF2F2F2) }
     var border: Color { Color(hex: dark ? 0x262626 : 0xEAEAEA) }
+    var controlBorder: Color { Color(hex: dark ? 0x3E3E3E : 0xD4D4D4) }
     var primary: Color { Color(hex: dark ? 0xEDEDED : 0x171717) }
     var muted: Color { Color(hex: dark ? 0xA1A1A1 : 0x666666) }
     var blue: Color { Color(hex: dark ? 0x52A8FF : 0x0070F3) }
@@ -273,10 +283,188 @@ struct DockeyEmptyState: View {
             Text(message).font(DockeyFonts.ui(12)).foregroundStyle(palette.muted)
                 .multilineTextAlignment(.center).frame(maxWidth: 380)
             if let actionTitle, let action {
-                Button(actionTitle, action: action).buttonStyle(.bordered).padding(.top, 2)
+                Button(actionTitle, action: action).buttonStyle(DockeyButtonStyle()).padding(.top, 2)
             }
         }
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Compact custom chrome around a native menu and native picker semantics.
+struct DockeySelectOption<Value: Hashable>: Identifiable {
+    let value: Value
+    let title: String
+    var id: Value { value }
+}
+
+struct DockeySelect<Value: Hashable>: View {
+    let title: String
+    @Binding var selection: Value
+    let options: [DockeySelectOption<Value>]
+    @Environment(\.colorScheme) private var scheme
+    @FocusState private var focused: Bool
+
+    private var selectedTitle: String {
+        options.first { $0.value == selection }?.title ?? "Choose…"
+    }
+
+    var body: some View {
+        let palette = DockeyPalette(scheme: scheme)
+        Menu {
+            Picker(title, selection: $selection) {
+                ForEach(options) { option in Text(option.title).tag(option.value) }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } label: {
+            DockeyMenuLabel(title: selectedTitle)
+        }
+        .menuStyle(.button)
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .tint(palette.primary)
+        .foregroundStyle(palette.primary)
+        .frame(maxWidth: .infinity, minHeight: 31, maxHeight: 31)
+        .modifier(DockeyMenuChrome(focused: focused))
+        .focused($focused)
+        .disabled(options.isEmpty)
+        .accessibilityLabel(title)
+        .accessibilityValue(selectedTitle)
+    }
+}
+
+/// Shared label for selects and menus that have additional commands.
+struct DockeyMenuLabel: View {
+    let title: String
+    var statusColor: Color? = nil
+    var expands = true
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let palette = DockeyPalette(scheme: scheme)
+        HStack(spacing: 8) {
+            if let statusColor { Circle().fill(statusColor).frame(width: 5, height: 5) }
+            Text(title).font(DockeyFonts.ui(11)).lineLimit(1).truncationMode(.tail)
+                .frame(maxWidth: expands ? nil : 160, alignment: .leading)
+            if expands { Spacer(minLength: 8) }
+            Image(systemName: "chevron.down")
+                .font(.system(size: 8, weight: .medium))
+                .foregroundStyle(palette.muted)
+                .accessibilityHidden(true)
+        }
+        .foregroundStyle(palette.primary)
+        .padding(.horizontal, 10)
+        .frame(minHeight: 31)
+        .contentShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+/// Applied to the actual Menu rather than its label, whose styling AppKit can discard.
+struct DockeyMenuChrome: ViewModifier {
+    var focused = false
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.isEnabled) private var enabled
+
+    func body(content: Content) -> some View {
+        let palette = DockeyPalette(scheme: scheme)
+        content
+            .background(palette.background, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(focused ? palette.blue : palette.controlBorder))
+            .opacity(enabled ? 1 : 0.45)
+            .contentShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+struct DockeyCheckboxStyle: ToggleStyle {
+    enum Placement: Equatable { case leading, trailing }
+    var placement: Placement = .leading
+    var expands = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        DockeyCheckboxControl(configuration: configuration, placement: placement, expands: expands)
+    }
+}
+
+private struct DockeyCheckboxControl: View {
+    let configuration: ToggleStyleConfiguration
+    let placement: DockeyCheckboxStyle.Placement
+    let expands: Bool
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.isEnabled) private var enabled
+    @FocusState private var focused: Bool
+    @ViewState<Bool> private var hovered = false
+
+    var body: some View {
+        let palette = DockeyPalette(scheme: scheme)
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                if placement == .leading { mark(palette) }
+                configuration.label
+                if expands { Spacer(minLength: 16) }
+                if placement == .trailing { mark(palette) }
+            }
+            .font(DockeyFonts.ui(11))
+            .foregroundStyle(palette.primary)
+            .padding(.vertical, 7)
+            .frame(maxWidth: expands ? .infinity : nil, minHeight: 31, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focused($focused)
+        .onHover { hovered = $0 }
+        .overlay {
+            if focused {
+                RoundedRectangle(cornerRadius: 5).stroke(palette.blue, lineWidth: 2).padding(-3)
+            }
+        }
+        .opacity(enabled ? 1 : 0.45)
+        .accessibilityRepresentation {
+            Toggle(isOn: Binding(get: { configuration.isOn }, set: { configuration.isOn = $0 })) {
+                configuration.label
+            }
+            .toggleStyle(.checkbox)
+        }
+    }
+
+    private func mark(_ palette: DockeyPalette) -> some View {
+        RoundedRectangle(cornerRadius: 3)
+            .fill(configuration.isOn ? palette.primary : palette.background)
+            .overlay {
+                RoundedRectangle(cornerRadius: 3)
+                    .stroke(configuration.isOn ? palette.primary : hovered ? palette.muted : palette.controlBorder)
+            }
+            .overlay {
+                if configuration.isOn {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(palette.background)
+                }
+            }
+            .frame(width: 15, height: 15)
+            .accessibilityHidden(true)
+    }
+}
+
+struct DockeyButtonStyle: ButtonStyle {
+    var prominent = false
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        let palette = DockeyPalette(scheme: scheme)
+        configuration.label
+            .font(DockeyFonts.ui(11, weight: .medium))
+            .foregroundStyle(prominent ? palette.background : palette.primary)
+            .padding(.horizontal, 11)
+            .frame(minHeight: 31)
+            .background(
+                prominent ? palette.primary : configuration.isPressed ? palette.hover : palette.background,
+                in: RoundedRectangle(cornerRadius: 6)
+            )
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(prominent ? palette.primary : palette.controlBorder))
+            .opacity(enabled ? configuration.isPressed ? 0.8 : 1 : 0.4)
     }
 }

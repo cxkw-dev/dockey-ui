@@ -40,9 +40,18 @@ struct DockeyApp: App {
             do {
                 try DockeyFonts.verifyBundledFonts()
                 print("Dockey bundled fonts verified.")
-                if options.screenshotPath == nil { exit(EXIT_SUCCESS) }
+                if options.screenshotPath == nil, options.iconPath == nil { exit(EXIT_SUCCESS) }
             } catch {
                 fputs("Dockey bundled font verification failed.\n", stderr)
+                exit(EXIT_FAILURE)
+            }
+        }
+        if let path = options.iconPath {
+            do {
+                try DockeyIcon.write(to: URL(fileURLWithPath: path), darkPreview: options.iconDarkPreview)
+                exit(EXIT_SUCCESS)
+            } catch {
+                fputs("Dockey could not render the requested icon.\n", stderr)
                 exit(EXIT_FAILURE)
             }
         }
@@ -92,25 +101,25 @@ final class DockeyAppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         let options = LaunchOptions()
+        if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+            let icon = NSImage(contentsOf: iconURL)
+        {
+            NSApp.applicationIconImage = icon
+        }
+        guard let path = options.screenshotPath else { return }
         Task { @MainActor in
             do {
                 try await Task.sleep(for: .milliseconds(1500))
-                if let icon = DockeyIcon.render() { NSApp.applicationIconImage = icon }
-                if let path = options.iconPath {
-                    try DockeyIcon.write(to: URL(fileURLWithPath: path), darkPreview: options.iconDarkPreview)
-                    NSApp.terminate(nil)
-                } else if let path = options.screenshotPath {
-                    guard let window = NSApp.windows.first(where: { $0.title == "Dockey" && $0.isVisible }) else {
-                        throw CocoaError(.fileWriteUnknown)
-                    }
-                    try AppScreenshot.capture(window: window, destination: URL(fileURLWithPath: path))
-                    NSApp.terminate(nil)
+                guard let window = NSApp.windows.first(where: { $0.title == "Dockey" && $0.isVisible }) else {
+                    throw CocoaError(.fileWriteUnknown)
                 }
+                try AppScreenshot.capture(window: window, destination: URL(fileURLWithPath: path))
+                NSApp.terminate(nil)
             } catch {
                 fputs(
                     "Dockey could not export the requested development artifact: \(error.localizedDescription)\n",
                     stderr)
-                if options.iconPath != nil || options.screenshotPath != nil { exit(EXIT_FAILURE) }
+                exit(EXIT_FAILURE)
             }
         }
     }
@@ -143,7 +152,7 @@ enum DockeyIcon {
         let renderer = ImageRenderer(
             content:
                 DockeyMascot()
-                .frame(width: 860, height: 860)
+                .frame(width: 1100, height: 1100)
                 .frame(width: 1024, height: 1024)
         )
         renderer.scale = 1
@@ -157,9 +166,23 @@ enum DockeyIcon {
             context.setFillColor(CGColor(srgbRed: 0.063, green: 0.075, blue: 0.09, alpha: 1))
             context.fill(CGRect(x: 0, y: 0, width: 1024, height: 1024))
         }
+        let tile = CGPath(
+            roundedRect: CGRect(x: 32, y: 32, width: 960, height: 960),
+            cornerWidth: 218, cornerHeight: 218, transform: nil)
+        context.addPath(tile)
+        context.setFillColor(CGColor(srgbRed: 0.10, green: 0.115, blue: 0.14, alpha: 1))
+        context.fillPath()
+        context.saveGState()
+        context.addPath(tile)
+        context.clip()
         context.setShadow(
-            offset: .zero, blur: 42, color: CGColor(srgbRed: 0.39, green: 0.82, blue: 0.84, alpha: 0.42))
+            offset: .zero, blur: 32, color: CGColor(srgbRed: 0.39, green: 0.82, blue: 0.84, alpha: 0.36))
         context.draw(mascot, in: CGRect(x: 0, y: 0, width: 1024, height: 1024))
+        context.restoreGState()
+        context.addPath(tile)
+        context.setStrokeColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.07))
+        context.setLineWidth(2)
+        context.strokePath()
         guard let image = context.makeImage() else { return nil }
         return NSImage(cgImage: image, size: NSSize(width: 1024, height: 1024))
     }

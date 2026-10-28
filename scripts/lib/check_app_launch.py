@@ -3,6 +3,8 @@
 
 import os
 from pathlib import Path
+import plistlib
+import shutil
 import signal
 import struct
 import subprocess
@@ -70,6 +72,55 @@ def copy_app(source, directory):
     return app
 
 
+def resource_bundle(app):
+    return app / "Contents/Resources/Dockey_Dockey.bundle"
+
+
+def set_resource_layout(app, layout):
+    """Normalize only a disposable app copy to either supported SwiftPM layout."""
+    bundle = resource_bundle(app)
+    candidates = [bundle / "Resources", bundle / "Contents/Resources/Resources"]
+    payloads = [path for path in candidates if (path / "Fonts/Geist-Regular.ttf").is_file()]
+    if len(payloads) != 1 or any(path.is_symlink() for path in bundle.rglob("*")):
+        raise LaunchCheckError("expected one self-contained font payload in the copied app")
+    if layout not in ("flat", "wrapped"):
+        raise LaunchCheckError(f"unsupported resource layout: {layout}")
+    payload = app.parent / "resource-payload"
+    shutil.copytree(payloads[0], payload)
+    shutil.rmtree(bundle)
+    destination = bundle / ("Resources" if layout == "flat" else "Contents/Resources/Resources")
+    shutil.copytree(payload, destination)
+    shutil.rmtree(payload)
+    if layout == "wrapped":
+        with (bundle / "Contents/Info.plist").open("wb") as metadata:
+            plistlib.dump(
+                {
+                    "CFBundleIdentifier": "dev.dockey.resources",
+                    "CFBundleName": "Dockey_Dockey",
+                    "CFBundlePackageType": "BNDL",
+                    "CFBundleVersion": "1",
+                },
+                metadata,
+            )
+
+
+def resign_app(app):
+    # Re-sign modified disposable copies so failures exercise resource validation,
+    # rather than a stale signature or operating-system launch rejection.
+    subprocess.run(
+        ["/usr/bin/codesign", "--force", "--deep", "--sign", "-", str(app)],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+    subprocess.run(
+        ["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+
+
 def verify_png(path):
     if not path.is_file():
         raise LaunchCheckError("native launch did not create a screenshot")
@@ -93,56 +144,49 @@ def verify_png(path):
     return width, height
 
 
+def check_layout(source, stage, layout, timeout):
+    intact_directory = stage / f"{layout}-intact"
+    intact_app = copy_app(source, intact_directory)
+    set_resource_layout(intact_app, layout)
+    resign_app(intact_app)
+
+    broken_directory = stage / f"{layout}-missing-font"
+    broken_app = copy_app(intact_app, broken_directory)
+    fonts = list(resource_bundle(broken_app).rglob("Geist-Regular.ttf"))
+    if len(fonts) != 1 or fonts[0].is_symlink():
+        raise LaunchCheckError("expected one real Geist-Regular.ttf inside the app resource bundle")
+    fonts[0].unlink()
+    resign_app(broken_app)
+    status, output = launch(broken_app, ["--demo", "--verify-resources"], broken_directory, timeout)
+    if status == 0 or "Dockey bundled font verification failed." not in output:
+        raise LaunchCheckError(f"{layout}: missing bundled font was not explicitly rejected")
+
+    screenshot = intact_directory / "dockey-demo.png"
+    status, output = launch(
+        intact_app,
+        ["--demo", "--verify-resources", "--appearance", "dark", "--screenshot", str(screenshot)],
+        intact_directory,
+        timeout,
+    )
+    if status != 0:
+        raise LaunchCheckError(f"{layout}: intact app exited with status {status}:\n{output}")
+    if "Dockey bundled fonts verified." not in output:
+        raise LaunchCheckError(f"{layout}: intact app did not confirm font verification")
+    width, height = verify_png(screenshot)
+    print(
+        f"Native launch check passed ({layout} resources): missing font rejected; "
+        f"intact app resources verified; {width}x{height} demo PNG decoded.",
+        flush=True,
+    )
+
+
 def main():
     source = Path(sys.argv[1])
     timeout = int(sys.argv[2])
     with tempfile.TemporaryDirectory(prefix="dockey-app-launch-") as temporary:
-        stage = Path(temporary)
-        broken_directory = stage / "missing-font"
-        broken_app = copy_app(source, broken_directory)
-        resources = broken_app / "Contents/Resources/Dockey_Dockey.bundle"
-        fonts = list(resources.rglob("Geist-Regular.ttf"))
-        if len(fonts) != 1 or fonts[0].is_symlink():
-            raise LaunchCheckError("expected one real Geist-Regular.ttf inside the app resource bundle")
-        fonts[0].unlink()
-        # Re-sign the disposable copy so rejection proves resource validation,
-        # rather than a stale code signature or operating-system launch failure.
-        subprocess.run(
-            ["/usr/bin/codesign", "--force", "--deep", "--sign", "-", str(broken_app)],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-        )
-        subprocess.run(
-            ["/usr/bin/codesign", "--verify", "--deep", "--strict", str(broken_app)],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-        )
-        status, output = launch(
-            broken_app, ["--demo", "--verify-resources"], broken_directory, timeout
-        )
-        if status == 0 or "Dockey bundled font verification failed." not in output:
-            raise LaunchCheckError("missing bundled font was not explicitly rejected")
-
-        intact_directory = stage / "intact"
-        intact_app = copy_app(source, intact_directory)
-        screenshot = intact_directory / "dockey-demo.png"
-        status, output = launch(
-            intact_app,
-            ["--demo", "--verify-resources", "--appearance", "dark", "--screenshot", str(screenshot)],
-            intact_directory,
-            timeout,
-        )
-        if status != 0:
-            raise LaunchCheckError(f"intact app exited with status {status}:\n{output}")
-        if "Dockey bundled fonts verified." not in output:
-            raise LaunchCheckError("intact app did not confirm bundle-contained font verification")
-        width, height = verify_png(screenshot)
-        print(
-            f"Native launch check passed: missing font rejected; intact app resources verified; "
-            f"{width}x{height} demo PNG decoded. No Docker connection was used."
-        )
+        for layout in ("flat", "wrapped"):
+            check_layout(source, Path(temporary), layout, timeout)
+    print("Both SwiftPM resource layouts passed. No Docker connection was used.")
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ enum DemoData {
         container("clickhouse", project: "analytics", image: "clickhouse:25-alpine", port: 8123),
         container("scheduler", project: "analytics", image: "analytics-jobs:latest"),
         container("redis-local", image: "redis:8-alpine", port: 6379),
+        container("documents-local", image: "mongo:8", port: 27017),
         container("mailpit", image: "axllent/mailpit:latest", state: .exited, port: 8025),
     ]
 
@@ -51,6 +52,10 @@ enum DemoData {
         ImageSummary(
             id: "demo-postgres", repository: "postgres", tag: "17-alpine", size: "277 MB", createdSince: "4 days ago"),
         ImageSummary(id: "demo-redis", repository: "redis", tag: "8-alpine", size: "42 MB", createdSince: "1 week ago"),
+        ImageSummary(id: "demo-mongo", repository: "mongo", tag: "8", size: "312 MB", createdSince: "3 days ago"),
+        ImageSummary(
+            id: "demo-clickhouse", repository: "clickhouse", tag: "25-alpine", size: "284 MB",
+            createdSince: "2 days ago"),
     ]
     static let volumes = [
         VolumeSummary(

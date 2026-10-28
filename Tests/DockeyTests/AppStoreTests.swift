@@ -75,14 +75,12 @@ struct AppStoreTests {
         var value = AppPreferences()
         value.appearance = "invalid"
         value.density = "invalid"
-        value.refreshInterval = .nan
         value.logFontSize = .infinity
         value.stopTimeout = -20
         value.logTail = Int.max
         value.normalize()
         #expect(value.appearance == "system")
         #expect(value.density == "compact")
-        #expect(value.refreshInterval == 5)
         #expect(value.logFontSize == 12)
         #expect(value.stopTimeout == 1)
         #expect(value.logTail == 10_000)

@@ -9,6 +9,7 @@ struct DockeySettingsView: View {
     @ViewState<SettingsSection> private var selected = .appearance
     @ViewState<String> private var executableDraft = ""
     @ViewState<Bool> private var showResetConfirmation = false
+    @FocusState private var executableFocused: Bool
     private var palette: DockeyPalette { DockeyPalette(scheme: scheme) }
 
     init(store: AppStore) {
@@ -99,10 +100,13 @@ struct DockeySettingsView: View {
             }.padding(.vertical, 17)
             sectionTitle("Density")
             settingRow("Row density", detail: "Compact keeps more containers in view.") {
-                Picker("Row density", selection: preference(\.density)) {
-                    Text("Compact").tag("compact")
-                    Text("Comfortable").tag("comfortable")
-                }.labelsHidden().frame(width: 145)
+                DockeySelect(
+                    title: "Row density", selection: preference(\.density),
+                    options: [
+                        .init(value: "compact", title: "Compact"),
+                        .init(value: "comfortable", title: "Comfortable"),
+                    ]
+                ).frame(width: 145)
             }
             readOnlyRow("Typography", detail: "Geist Sans for the interface; Geist Mono for logs.", value: "Geist")
             readOnlyRow("Motion", detail: "Follows the macOS Reduce Motion preference.", value: "System")
@@ -143,14 +147,14 @@ struct DockeySettingsView: View {
                     Spacer()
                     if selected {
                         Image(systemName: "checkmark").font(.system(size: 10, weight: .medium)).foregroundStyle(
-                            palette.blue)
+                            palette.primary)
                     }
                 }
             }
             .padding(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 7).stroke(
-                    selected ? palette.blue : palette.border, lineWidth: selected ? 2 : 1)
+                    selected ? palette.primary : palette.controlBorder, lineWidth: selected ? 1.5 : 1)
             )
             .contentShape(Rectangle())
         }
@@ -163,10 +167,11 @@ struct DockeySettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             sectionTitle("Local engine")
             settingRow("Docker context", detail: "Selected for Dockey; does not switch your global CLI context.") {
-                Picker("Docker context", selection: $store.selectedContext) {
-                    ForEach(store.contexts.filter(\.isLocal)) { context in Text(context.name).tag(context.name) }
-                }
-                .labelsHidden().frame(width: 160).disabled(store.isDemo)
+                DockeySelect(
+                    title: "Docker context", selection: $store.selectedContext,
+                    options: store.contexts.filter(\.isLocal).map { .init(value: $0.name, title: $0.name) }
+                )
+                .frame(width: 160).disabled(store.isDemo)
             }
             if let context = store.contexts.first(where: { $0.name == store.selectedContext }) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -184,9 +189,17 @@ struct DockeySettingsView: View {
             )
             .font(DockeyFonts.ui(11)).foregroundStyle(palette.muted).padding(.vertical, 12)
             HStack(spacing: 9) {
-                TextField("Auto-detect Docker", text: $executableDraft).textFieldStyle(.roundedBorder)
-                    .font(DockeyFonts.mono(11)).accessibilityLabel("Docker executable path")
-                Button("Browse…") { store.chooseDockerExecutable() }
+                TextField("Auto-detect Docker", text: $executableDraft).textFieldStyle(.plain)
+                    .font(DockeyFonts.mono(11))
+                    .focused($executableFocused)
+                    .padding(.horizontal, 10).frame(height: 31)
+                    .background(palette.background, in: RoundedRectangle(cornerRadius: 6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6).stroke(
+                            executableFocused ? palette.blue : palette.controlBorder)
+                    )
+                    .accessibilityLabel("Docker executable path")
+                Button("Browse…") { store.chooseDockerExecutable() }.buttonStyle(DockeyButtonStyle())
             }.disabled(store.isDemo)
             HStack(spacing: 10) {
                 Button("Apply & reconnect") {
@@ -194,6 +207,7 @@ struct DockeySettingsView: View {
                     store.savePreferences()
                     Task { await store.refresh() }
                 }
+                .buttonStyle(DockeyButtonStyle(prominent: true))
                 .disabled(store.isDemo || store.isRefreshing)
                 if store.isRefreshing { ProgressView().controlSize(.small) }
             }.padding(.top, 15)
@@ -210,19 +224,16 @@ struct DockeySettingsView: View {
             toggleRow(
                 "Show stopped containers", detail: "Keep stopped services visible in their project.",
                 binding: preference(\.showStopped))
-            settingRow("Metrics refresh", detail: "How often Dockey refreshes engine resources.") {
-                Picker("Refresh interval", selection: preference(\.refreshInterval)) {
-                    Text("2 seconds").tag(2.0)
-                    Text("5 seconds").tag(5.0)
-                    Text("10 seconds").tag(10.0)
-                    Text("30 seconds").tag(30.0)
-                }.labelsHidden().frame(width: 140)
-            }
+            readOnlyRow(
+                "Updates", detail: "Container changes arrive automatically from the selected engine.",
+                value: "Automatic")
             sectionTitle("Operation defaults")
             settingRow("Stop timeout", detail: "Seconds to wait for a graceful container shutdown.") {
-                Picker("Stop timeout", selection: preference(\.stopTimeout)) {
-                    ForEach([10, 20, 30, 60], id: \.self) { Text("\($0) seconds").tag($0) }
-                }.labelsHidden().frame(width: 140)
+                DockeySelect(
+                    title: "Stop timeout", selection: preference(\.stopTimeout),
+                    options: [10, 20, 30, 60].map { .init(value: $0, title: "\($0) seconds") }
+                )
+                .frame(width: 140)
             }
             Text(
                 "Group controls act on existing containers. They do not create services or apply changed Compose files."
@@ -235,9 +246,11 @@ struct DockeySettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             sectionTitle("Log display")
             settingRow("Initial tail", detail: "Existing log lines to load when opening a container.") {
-                Picker("Initial log tail", selection: preference(\.logTail)) {
-                    ForEach([100, 500, 1000, 5000], id: \.self) { Text("\($0) lines").tag($0) }
-                }.labelsHidden().frame(width: 140)
+                DockeySelect(
+                    title: "Initial log tail", selection: preference(\.logTail),
+                    options: [100, 500, 1000, 5000].map { .init(value: $0, title: "\($0.formatted()) lines") }
+                )
+                .frame(width: 140)
             }
             toggleRow(
                 "Show timestamps", detail: "Display the container's log timestamps.",
@@ -246,9 +259,11 @@ struct DockeySettingsView: View {
                 "Wrap long lines", detail: "Fit long log messages to the available width.",
                 binding: preference(\.logWrap))
             settingRow("Text size", detail: "Independent of the interface text size.") {
-                Picker("Log text size", selection: preference(\.logFontSize)) {
-                    ForEach([10.0, 11.0, 12.0, 13.0, 14.0, 16.0], id: \.self) { Text("\(Int($0)) pt").tag($0) }
-                }.labelsHidden().frame(width: 140)
+                DockeySelect(
+                    title: "Log text size", selection: preference(\.logFontSize),
+                    options: [10.0, 11.0, 12.0, 13.0, 14.0, 16.0].map { .init(value: $0, title: "\(Int($0)) pt") }
+                )
+                .frame(width: 140)
             }
             Text(
                 "The in-memory display buffer is bounded. These preferences do not change Docker's log retention policy."
@@ -277,7 +292,8 @@ struct DockeySettingsView: View {
             )
             .font(DockeyFonts.ui(11)).foregroundStyle(palette.muted).padding(.top, 18)
             sectionTitle("Application preferences")
-            Button("Reset app preferences…") { showResetConfirmation = true }.padding(.top, 16)
+            Button("Reset app preferences…") { showResetConfirmation = true }
+                .buttonStyle(DockeyButtonStyle()).padding(.top, 16)
         }
     }
 
@@ -347,9 +363,17 @@ struct DockeySettingsView: View {
     }
 
     private func toggleRow(_ title: String, detail: String, binding: Binding<Bool>) -> some View {
-        settingRow(title, detail: detail) {
-            Toggle(title, isOn: binding).labelsHidden().toggleStyle(.switch).accessibilityLabel(title)
+        Toggle(isOn: binding) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(DockeyFonts.ui(12, weight: .medium))
+                Text(detail).font(DockeyFonts.ui(11)).foregroundStyle(palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+        .toggleStyle(DockeyCheckboxStyle(placement: .trailing, expands: true))
+        .accessibilityLabel(title)
+        .padding(.vertical, 8)
+        .overlay(alignment: .bottom) { Rectangle().fill(palette.border).frame(height: 1) }
     }
 
     private func readOnlyRow(_ title: String, detail: String, value: String) -> some View {

@@ -8,8 +8,9 @@ usage() {
 Usage: ./scripts/check-app-launch.sh [--app PATH] [--timeout SECONDS]
 Defaults: ./dist/Dockey.app and a 30-second limit for each launch.
 
-Copies the app into an isolated temporary location, proves that a missing bundled
-font is rejected, then verifies the intact app can launch and export a valid PNG.
+Copies the app into an isolated temporary location and tests both flat SwiftPM
+and wrapped SwiftBuild resource bundles. Each shape must reject a missing font
+and verify that the intact app can launch and export a valid PNG.
 Requires a macOS graphical session and Python 3. Uses demo data only.
 USAGE
 }

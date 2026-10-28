@@ -7,7 +7,10 @@ struct RootView: View {
     @ObservedObject var store: AppStore
     @Environment(\.colorScheme) private var scheme
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.scenePhase) private var scenePhase
     @ViewState<StopRequest?> private var stopRequest = nil
+    @FocusState private var contextMenuFocused: Bool
+    @ViewState<Bool> private var contextMenuHovered = false
 
     init(store: AppStore) {
         self.store = store
@@ -45,6 +48,15 @@ struct RootView: View {
         .frame(minWidth: 900, minHeight: 580)
         .toolbar { toolbar }
         .task { await store.start() }
+        .onAppear { store.setApplicationActive(scenePhase == .active) }
+        .onChange(of: scenePhase) { _, phase in store.setApplicationActive(phase == .active) }
+        .onPreferenceChange(DockeyMetricsVisibilityKey.self) { visible in
+            Task { @MainActor in store.setMetricsVisible(visible) }
+        }
+        .onDisappear {
+            store.setMetricsVisible(false)
+            store.setApplicationActive(false)
+        }
         .onChange(of: store.selectedContext) { _, _ in Task { await store.refresh() } }
         .confirmationDialog(
             "Stop existing containers?",
@@ -200,12 +212,21 @@ struct RootView: View {
                     Divider()
                     Button("Connection settings…") { openSettings() }
                 } label: {
-                    HStack(spacing: 6) {
-                        Circle().fill(store.isConnected ? palette.green : palette.muted).frame(width: 5, height: 5)
-                        Text(store.selectedContext.isEmpty ? "Connection" : store.selectedContext)
-                            .font(DockeyFonts.ui(11))
-                    }
+                    DockeyMenuLabel(
+                        title: store.selectedContext.isEmpty ? "Connection" : store.selectedContext,
+                        statusColor: store.isConnected ? palette.green : palette.muted, expands: false)
                 }
+                .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain)
+                .tint(palette.primary).foregroundStyle(palette.primary)
+                .fixedSize(horizontal: true, vertical: false)
+                .background(contextMenuHovered ? palette.hover : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .overlay {
+                    if contextMenuFocused { RoundedRectangle(cornerRadius: 6).stroke(palette.blue) }
+                }
+                .onHover { contextMenuHovered = $0 }
+                .focused($contextMenuFocused)
+                .accessibilityLabel("Docker context")
+                .accessibilityValue(store.selectedContext.isEmpty ? "No context selected" : store.selectedContext)
                 .help("Choose a local context for Dockey")
             }
             Button {
@@ -303,6 +324,13 @@ struct RootView: View {
                 Text(
                     store.isDemo
                         ? "Demo · sample data" : store.isConnected ? "Docker Engine connected" : "Engine unavailable")
+                if let error = store.liveUpdateError {
+                    Text("Updates reconnecting").foregroundStyle(palette.amber).help(error)
+                } else if let error = store.metricsError {
+                    Text("Metrics reconnecting").foregroundStyle(palette.amber).help(error)
+                } else if store.isConnected && !store.isDemo {
+                    Text("Live updates").help("Container changes arrive from the selected engine automatically.")
+                }
                 if let info = store.engineInfo {
                     Rectangle().fill(palette.border).frame(width: 1, height: 13)
                     Label("\(info.cpus) CPUs", systemImage: "cpu")

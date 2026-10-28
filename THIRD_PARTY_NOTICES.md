@@ -17,4 +17,10 @@ SwiftUI, AppKit, Foundation, and system symbols are provided by macOS. Docker an
 
 ## Dockey artwork
 
-The flat Dockey mascot and repository vector artwork are project assets under the repository's [Apache-2.0 license](LICENSE). The brand has its own identity; no Docker or Vercel logo is bundled. Dockey is not affiliated with Docker, Colima, or Vercel.
+The flat Dockey mascot and repository vector artwork are project assets under the repository's [Apache-2.0 license](LICENSE). This includes the original service-identification illustrations in `design-assets/services/`: analytical columns, a leaf and document, cache layers, and a small elephant. These are original Dockey illustrations, not official vendor logos or copied vendor SVG paths. See [service illustration provenance and brand research](docs/service-icons.md).
+
+No Docker, Vercel, ClickHouse, MongoDB, Redis, or PostgreSQL logo is bundled. Dockey is not affiliated with Docker, Colima, Vercel, or these database vendors and communities.
+
+## Product names
+
+Product names identify software suggested by an image repository; they do not indicate sponsorship, certification, or image-provenance verification. ClickHouse is a registered trademark of ClickHouse, Inc. MongoDB is a trademark or registered trademark of MongoDB, Inc. Redis is a registered trademark of Redis Ltd. Postgres, PostgreSQL, and the Slonik Logo are trademarks or registered trademarks of the PostgreSQL Community Association of Canada. All product names and marks remain the property of their respective owners.

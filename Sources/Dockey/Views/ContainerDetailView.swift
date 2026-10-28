@@ -87,6 +87,7 @@ struct ContainerDetailView: View {
             metricStrip
             detailContent
         }
+        .preference(key: DockeyMetricsVisibilityKey.self, value: container.isRunning)
         .onChange(of: store.detailTab) { _, _ in Task { await store.refreshDetail() } }
     }
 
@@ -150,7 +151,7 @@ struct ContainerDetailView: View {
                 }
                 .font(DockeyFonts.ui(11)).padding(.horizontal, 10).frame(height: 30)
                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(palette.border))
-                Toggle("Follow", isOn: $followLogs).toggleStyle(.checkbox).font(DockeyFonts.ui(11))
+                Toggle("Follow", isOn: $followLogs).toggleStyle(DockeyCheckboxStyle()).font(DockeyFonts.ui(11))
                     .fixedSize().help("Automatically scroll to new log output")
                 Button {
                     store.copyToClipboard(filteredLogs)
