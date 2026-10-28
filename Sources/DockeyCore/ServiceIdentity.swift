@@ -3,7 +3,9 @@ import Foundation
 /// A presentation hint from a known image repository, not proof of image provenance or signatures.
 /// Container names, Compose service names, and arbitrary registry mirrors do not establish identity.
 public enum ServiceIdentity: String, Sendable, CaseIterable, Identifiable {
-    case clickhouse, mongodb, redis, postgresql, generic
+    case clickhouse, mongodb, redis, postgresql, langfuse, temporal
+    case aiFocus = "ai-focus"
+    case generic
 
     public var id: String { rawValue }
 
@@ -13,33 +15,65 @@ public enum ServiceIdentity: String, Sendable, CaseIterable, Identifiable {
         case .mongodb: "MongoDB"
         case .redis: "Redis"
         case .postgresql: "PostgreSQL"
+        case .langfuse: "Langfuse"
+        case .temporal: "Temporal"
+        case .aiFocus: "AI Focus"
         case .generic: "Container"
         }
     }
 
     public init(imageReference: String) {
-        guard let repository = Self.dockerHubRepository(imageReference) else {
+        guard let repository = Self.normalizedRepository(imageReference) else {
             self = .generic
             return
         }
-        switch repository {
-        case "clickhouse/clickhouse-server": self = .clickhouse
-        case "mongodb/mongodb-community-server", "mongodb/mongodb-enterprise-server", "mongodb/mongodb-atlas-local":
-            self = .mongodb
-        case "redis/redis-stack", "redis/redis-stack-server": self = .redis
-        default:
-            let components = repository.split(separator: "/")
-            if components.count == 1 {
-                self = Self.officialImage(String(components[0]))
-            } else if components.count == 2,
-                components[0] == "library" || Self.officialArchitectureNamespaces.contains(String(components[0]))
-            {
-                self = Self.officialImage(String(components[1]))
-            } else {
-                self = .generic
-            }
+        // The user's local app has this unqualified image name. A registry or namespace
+        // using the same leaf name does not establish that it is the same application.
+        if repository.isUnqualified, repository.path == "ai-focus" {
+            self = .aiFocus
+            return
+        }
+        if let known = Self.vendorRepositories[repository.registry + "/" + repository.path] {
+            self = known
+            return
+        }
+        guard repository.registry == "docker.io" else {
+            self = .generic
+            return
+        }
+        let components = repository.path.split(separator: "/")
+        if components.count == 1 {
+            self = Self.officialImage(String(components[0]))
+        } else if components.count == 2,
+            components[0] == "library" || Self.officialArchitectureNamespaces.contains(String(components[0]))
+        {
+            self = Self.officialImage(String(components[1]))
+        } else {
+            self = .generic
         }
     }
+
+    // Keep registry ownership in every vendor match. A familiar repository path on another
+    // registry does not imply that the vendor published it.
+    private static let vendorRepositories: [String: ServiceIdentity] = [
+        "docker.io/clickhouse/clickhouse-server": .clickhouse,
+        "docker.io/mongodb/mongodb-community-server": .mongodb,
+        "docker.io/mongodb/mongodb-enterprise-server": .mongodb,
+        "docker.io/mongodb/mongodb-atlas-local": .mongodb,
+        "docker.io/redis/redis-stack": .redis,
+        "docker.io/redis/redis-stack-server": .redis,
+        "docker.io/langfuse/langfuse": .langfuse,
+        "docker.io/langfuse/langfuse-worker": .langfuse,
+        "ghcr.io/langfuse/langfuse": .langfuse,
+        "ghcr.io/langfuse/langfuse-worker": .langfuse,
+        "docker.langfuse.com/langfuse/langfuse": .langfuse,
+        "docker.langfuse.com/langfuse/langfuse-worker": .langfuse,
+        "docker.io/temporalio/auto-setup": .temporal,
+        "docker.io/temporalio/server": .temporal,
+        "docker.io/temporalio/temporal": .temporal,
+        "docker.io/temporalio/admin-tools": .temporal,
+        "docker.io/temporalio/ui": .temporal,
+    ]
 
     private static func officialImage(_ name: String) -> Self {
         switch name {
@@ -56,7 +90,7 @@ public enum ServiceIdentity: String, Sendable, CaseIterable, Identifiable {
         "amd64", "arm32v5", "arm32v6", "arm32v7", "arm64v8", "i386", "ppc64le", "riscv64", "s390x",
     ]
 
-    private static func dockerHubRepository(_ reference: String) -> String? {
+    private static func normalizedRepository(_ reference: String) -> (registry: String, path: String, isUnqualified: Bool)? {
         guard reference.utf8.count <= 4_096 else { return nil }
         let trimmed = reference.trimmingCharacters(in: .whitespacesAndNewlines)
         let digestParts = trimmed.split(separator: "@", omittingEmptySubsequences: false)
@@ -71,17 +105,20 @@ public enum ServiceIdentity: String, Sendable, CaseIterable, Identifiable {
         }
         guard !leaf.isEmpty else { return nil }
         components.append(leaf)
+        let isUnqualified = components.count == 1
+        var registry = "docker.io"
         if components.count > 1, let first = components.first,
             first.contains(".") || first.contains(":") || first == "localhost"
         {
-            // These are Docker Hub registry hostnames. Ports and other registries remain generic.
-            guard ["docker.io", "index.docker.io", "registry-1.docker.io"].contains(first.lowercased()) else {
-                return nil
+            switch first.lowercased() {
+            case "docker.io", "index.docker.io", "registry-1.docker.io": registry = "docker.io"
+            case "ghcr.io", "docker.langfuse.com": registry = first.lowercased()
+            default: return nil
             }
             components.removeFirst()
         }
         guard !components.isEmpty else { return nil }
-        return components.joined(separator: "/")
+        return (registry, components.joined(separator: "/"), isUnqualified)
     }
 
     private static func isValidTag(_ tag: Substring) -> Bool {

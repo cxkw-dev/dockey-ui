@@ -31,7 +31,7 @@ Built with **SwiftUI and AppKit**. No Electron, browser server, account, or tele
 | Control existing containers | Start, stop, and restart one container or a group, with pending state and specific operation results. Start is muted green; Stop is muted red. |
 | Investigate a service | Follow bounded logs, inspect redacted configuration, and view ports, mounts, and current resource metrics. |
 | Inspect local resources | Browse images, volumes, and networks without deleting them. |
-| Recognize services | Original monochrome icons identify ClickHouse, MongoDB, Redis, and PostgreSQL image families, with a generic fallback. [Artwork and source research](docs/service-icons.md). |
+| Recognize services | Official monochrome ClickHouse, Langfuse, Temporal, and standalone MongoDB marks; AI Focus's F; Redis cache lines; and a Lucide elephant for PostgreSQL. Icons share a consistent layout with adjusted visual sizes. [Sources and licenses](docs/service-icons.md). |
 | Choose a connection | Select a local Docker context within Dockey. The global Docker CLI context is unchanged. |
 | Stay current | Docker events drive container updates; live metrics stream while visible. No repeating inventory polling. |
 | Make it comfortable | System/light/dark appearance, compact/comfortable rows, log preferences, and stop confirmation. |
@@ -97,7 +97,7 @@ open dist/Dockey.app --args --demo
 
 `check.sh` runs the Swift Testing suite through `scripts/test.sh` and disposable installation/archive checks. The wrapper works with Command Line Tools installations that do not include XCTest and explicitly loads the selected toolchain's Swift Testing macro plugin when needed. The installer tests use an isolated signed fixture app, not your installed copy or Docker resources. CI runs on Apple Silicon and Intel macOS runners and produces app ZIPs and checksums.
 
-`check-app-launch.sh` exercises temporary app copies with both flat SwiftPM and wrapped SwiftBuild resource bundles. Its default check rejects a missing font, verifies intact fonts/licenses, and exports a readable native demo PNG within a bounded timeout. Apple Silicon CI runs this full check. Intel CI explicitly uses `--resources-only`: both layouts must pass startup/resource verification and missing-font rejection, but GUI rendering is not tested. The Intel hosted runner aborts during Metal rendering; physical Intel visual compatibility remains unverified. There is no automatic fallback, and neither mode connects to Docker. See [verification limits](docs/verification.md#compatibility-limits).
+`check-app-launch.sh` exercises temporary app copies with both flat SwiftPM and wrapped SwiftBuild resource bundles. Its default check rejects a missing font or service mark, verifies intact fonts, marks, and licenses, and exports a readable native demo PNG within a bounded timeout. Apple Silicon CI runs this full check. Intel CI explicitly uses `--resources-only`: both layouts must pass startup/resource verification and missing-font/mark rejection, but GUI rendering is not tested. The Intel hosted runner aborts during Metal rendering; physical Intel visual compatibility remains unverified. There is no automatic fallback, and neither mode connects to Docker. See [verification limits](docs/verification.md#compatibility-limits).
 
 [Refresh performance and measured bottlenecks →](docs/performance.md)
 
@@ -131,7 +131,7 @@ Tests/DockeyCoreTests/   Synthetic model/client/process tests
 Tools/DockeySmoke/       Explicit live-integration probe for disposable fixtures
 scripts/                Build, installation, removal, and packaging
 docs/                   Architecture, guides, design decisions, screenshots
-design-assets/          Original flat mascot and vector icon sources
+design-assets/          Mascot, original icons, and licensed vendor vector sources
 prototypes/             Browser design studies retained as references
 ```
 
@@ -139,6 +139,6 @@ prototypes/             Browser design studies retained as references
 
 ## License and acknowledgments
 
-Dockey source is licensed under [Apache-2.0](LICENSE). Geist fonts retain their SIL Open Font License notices. See [third-party notices](THIRD_PARTY_NOTICES.md).
+Dockey source is licensed under [Apache-2.0](LICENSE). Geist fonts retain their SIL Open Font License notices; vendor marks retain their upstream licenses and ownership. See [third-party notices](THIRD_PARTY_NOTICES.md).
 
 The design adapts [Vercel's Geist design language](https://vercel.com/geist/introduction) for a native Mac utility, with Dockey's own mascot and identity. Dockey is an independent project and is not affiliated with Docker, Colima, or Vercel.

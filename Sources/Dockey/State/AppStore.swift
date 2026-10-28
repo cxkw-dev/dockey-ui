@@ -3,6 +3,8 @@ import Combine
 import DockeyCore
 import Foundation
 
+enum LogStreamState: Equatable { case idle, connecting, following, ended, failed }
+
 @MainActor
 final class AppStore: ObservableObject {
     @Published var containers: [DockerContainer] = []
@@ -26,6 +28,7 @@ final class AppStore: ObservableObject {
     @Published var expandedGroupIDs: Set<String> = []
     @Published var isRefreshing = false
     @Published private var loadingResourceSections: Set<String> = []
+    @Published private var resourceErrors: [String: String] = [:]
     @Published private(set) var liveUpdateError: String?
     @Published private(set) var metricsError: String?
     @Published var connectionError: String?
@@ -33,6 +36,10 @@ final class AppStore: ObservableObject {
     @Published var pendingContainerIDs: Set<String> = []
     @Published var activity: [ActivityEntry] = []
     @Published var inspection: ContainerInspection?
+    @Published private(set) var isLoadingInspection = false
+    @Published private(set) var inspectionError: String?
+    @Published private(set) var logStreamState: LogStreamState = .idle
+    @Published private(set) var logError: String?
     @Published var logText = ""
     @Published var detailTab: DetailTab = .logs
     @Published var isDemo: Bool
@@ -55,6 +62,9 @@ final class AppStore: ObservableObject {
     private var eventsTask: Task<Void, Never>?
     private var eventsRequestID: UUID?
     private var eventReconciliationTask: Task<Void, Never>?
+    private var eventResynchronizationTask: Task<Void, Never>?
+    private var eventResynchronizationRequested = false
+    private var eventStreamID: UUID?
     private var inventoryInvalidated = false
     private var resourcesInvalidated: Set<String> = []
     private var isApplicationActive = false
@@ -74,6 +84,7 @@ final class AppStore: ObservableObject {
     private var mutationClients: [UUID: DockerClient] = [:]
     private var configurationGeneration = 0
     private var currentDetailRequest: UUID?
+    private var currentLogRequest: UUID?
     private var isShuttingDown = false
     private var logBuffer = LogBuffer()
     private let defaults: UserDefaults
@@ -110,12 +121,13 @@ final class AppStore: ObservableObject {
     var unhealthyCount: Int { containers.filter(\.isUnhealthy).count }
     var isConnected: Bool { connected && connectionError == nil && loadedContext == selectedContext }
     var isLoadingResources: Bool { loadingResourceSections.contains(selectedSection.rawValue) }
+    var resourceError: String? { resourceErrors[selectedSection.rawValue] }
 
     var groups: [ContainerGroup] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         return ContainerGrouping.groups(containers: containers, context: selectedContext).compactMap { group in
             let filtered = group.containers.filter { container in
-                guard preferences.showStopped || container.isRunning else { return false }
+                guard preferences.showStopped || ![.created, .exited, .dead].contains(container.state) else { return false }
                 let stateMatches: Bool
                 switch stateFilter {
                 case .all: stateMatches = true
@@ -267,6 +279,10 @@ final class AppStore: ObservableObject {
             stats = [:]
             stopStatsSubscription()
             logTask?.cancel()
+            if selectedContainerID != nil {
+                logError = "Engine unavailable: \(message)"
+                logStreamState = .failed
+            }
         }
     }
 
@@ -327,9 +343,15 @@ final class AppStore: ObservableObject {
                 guard !Task.isCancelled, self.scopeMatches(context, generation: generation),
                     self.eventsRequestID == requestID
                 else { return }
-                // Reconcile once after every subscription opens, including reconnects, to cover gaps.
-                await self.requestSnapshot(explicit: false, afterInvalidation: true)
-                if self.isConnected, self.liveUpdateError != nil { self.liveUpdateError = nil }
+                // Event gaps may include resource changes with no subsequent event to invalidate a fresh cache.
+                for section in [AppSection.images, .volumes, .networks] {
+                    self.resourcesFetchedAt.removeValue(forKey: section.rawValue)
+                    self.resourceInvalidationVersions[section.rawValue, default: 0] &+= 1
+                }
+                self.engineInfoFetchedAt = nil
+                // Drain events immediately; reconciliation must not fill the bounded stream buffer.
+                self.eventStreamID = UUID()
+                self.scheduleEventResynchronization(context: context, generation: generation)
                 do {
                     for try await event in stream {
                         guard !Task.isCancelled, self.scopeMatches(context, generation: generation),
@@ -340,11 +362,13 @@ final class AppStore: ObservableObject {
                         self.receiveEngineEvent(event, client: client, context: context, generation: generation)
                     }
                     guard !Task.isCancelled else { return }
+                    self.eventStreamID = nil
                     self.liveUpdateError = "Live engine updates disconnected. Reconnecting…"
                 } catch {
                     guard !Task.isCancelled, self.scopeMatches(context, generation: generation),
                         self.eventsRequestID == requestID
                     else { return }
+                    self.eventStreamID = nil
                     let message = "Live engine updates interrupted: \(error.localizedDescription)"
                     if self.liveUpdateError != message { self.liveUpdateError = message }
                 }
@@ -353,6 +377,25 @@ final class AppStore: ObservableObject {
                 delay = min(delay * 2, 30)
                 since = Date()
             }
+        }
+    }
+
+    private func scheduleEventResynchronization(context: String, generation: Int) {
+        eventResynchronizationRequested = true
+        guard eventResynchronizationTask == nil else { return }
+        eventResynchronizationTask = Task { [weak self] in
+            guard let self else { return }
+            while self.eventResynchronizationRequested {
+                guard self.scopeMatches(context, generation: generation), !Task.isCancelled else { return }
+                self.eventResynchronizationRequested = false
+                let streamID = self.eventStreamID
+                await self.requestSnapshot(explicit: false, afterInvalidation: true)
+                guard self.scopeMatches(context, generation: generation), !Task.isCancelled else { return }
+                if self.eventStreamID == streamID, streamID != nil, self.isConnected {
+                    self.liveUpdateError = nil
+                }
+            }
+            self.eventResynchronizationTask = nil
         }
     }
 
@@ -536,9 +579,13 @@ final class AppStore: ObservableObject {
                     }
                 default: break
                 }
+                if self.scopeMatches(context, generation: generation), !Task.isCancelled {
+                    self.resourceErrors.removeValue(forKey: key)
+                }
             } catch {
-                if reportErrors, self.scopeMatches(context, generation: generation), !Task.isCancelled {
-                    self.operationError = error.localizedDescription
+                if self.scopeMatches(context, generation: generation), !Task.isCancelled {
+                    self.resourceErrors[key] = error.localizedDescription
+                    if reportErrors { self.addActivity("\(section.label) could not load: \(error.localizedDescription)", isError: true) }
                 }
             }
         }
@@ -558,6 +605,12 @@ final class AppStore: ObservableObject {
         let ids = Set(ContainerGrouping.groups(containers: containers, context: selectedContext).map(\.id))
         let updated = expandedGroupIDs.intersection(ids).union(ids.subtracting(previous))
         if expandedGroupIDs != updated { expandedGroupIDs = updated }
+    }
+
+    func retryResources() async {
+        guard !isDemo, isConnected, let client else { return }
+        await refreshResources(selectedSection, client: client, context: selectedContext,
+            generation: configurationGeneration, force: true, reportErrors: true)
     }
 
     func selectSection(_ section: AppSection) {
@@ -581,8 +634,13 @@ final class AppStore: ObservableObject {
         detailTask?.cancel()
         inspectionTask?.cancel()
         selectedContainerID = container.id
+        currentLogRequest = nil
+        logError = nil
+        logStreamState = .connecting
         detailTab = .logs
         inspection = nil
+        inspectionError = nil
+        isLoadingInspection = true
         resetLogs()
         logTask?.cancel()
         detailTask = Task { [weak self] in await self?.refreshDetail() }
@@ -594,6 +652,11 @@ final class AppStore: ObservableObject {
         inspectionTask?.cancel()
         inspectionTask = nil
         currentDetailRequest = nil
+        currentLogRequest = nil
+        isLoadingInspection = false
+        inspectionError = nil
+        logError = nil
+        logStreamState = .idle
         logTask?.cancel()
         logTask = nil
         selectedContainerID = nil
@@ -691,60 +754,101 @@ final class AppStore: ObservableObject {
     func clearOperationError() { operationError = nil }
 
     func refreshDetail() async {
+        beginLogs(clearBuffer: true)
+        await retryInspection()
+    }
+
+    func retryInspection() async {
         guard let container = selectedContainer else { return }
         let id = container.id
         let context = selectedContext
         let generation = configurationGeneration
         let requestID = UUID()
         currentDetailRequest = requestID
+        inspectionTask?.cancel()
+        inspectionError = nil
+        isLoadingInspection = true
+        defer {
+            if currentDetailRequest == requestID, scopeMatches(context, generation: generation) {
+                isLoadingInspection = false
+            }
+        }
         if isDemo {
             inspection = DemoData.inspection(for: container)
-            resetLogs()
-            appendLog(DemoData.logs)
             return
         }
-        guard let client else { return }
-        inspectionTask?.cancel()
+        guard let client else {
+            inspectionError = "Connect to the engine before loading inspection."
+            return
+        }
         let request = Task { try await client.inspect(containerID: id, context: context) }
         inspectionTask = request
         do {
             let value = try await request.value
-            guard selectedContainerID == id, selectedContext == context, generation == configurationGeneration,
-                currentDetailRequest == requestID, !Task.isCancelled
-            else { return }
+            guard selectedContainerID == id, scopeMatches(context, generation: generation),
+                currentDetailRequest == requestID, !Task.isCancelled else { return }
             inspection = value
         } catch is CancellationError {
             return
         } catch {
-            if selectedContainerID == id, selectedContext == context, generation == configurationGeneration,
-                currentDetailRequest == requestID
-            {
-                operationError = error.localizedDescription
-            }
+            guard selectedContainerID == id, scopeMatches(context, generation: generation),
+                currentDetailRequest == requestID, !Task.isCancelled else { return }
+            inspectionError = error.localizedDescription
         }
-        guard selectedContainerID == id, selectedContext == context, generation == configurationGeneration,
-            currentDetailRequest == requestID, !Task.isCancelled
-        else { return }
+    }
+
+    func retryLogs() { beginLogs(clearBuffer: false) }
+
+    private func beginLogs(clearBuffer: Bool) {
+        guard let container = selectedContainer else { return }
         logTask?.cancel()
-        resetLogs()
+        let id = container.id
+        let context = selectedContext
+        let generation = configurationGeneration
+        let requestID = UUID()
+        currentLogRequest = requestID
+        logError = nil
+        logStreamState = .connecting
+        if clearBuffer { resetLogs() }
+        if isDemo {
+            resetLogs()
+            appendLog(DemoData.logs)
+            logStreamState = .following
+            return
+        }
+        guard let client else {
+            logError = "Connect to the engine before loading logs."
+            logStreamState = .failed
+            return
+        }
         let tail = preferences.logTail
         let timestamps = preferences.logTimestamps
         logTask = Task { [weak self] in
             let stream = await client.logStream(containerID: id, context: context, tail: tail, timestamps: timestamps)
+            guard let self, self.selectedContainerID == id, self.scopeMatches(context, generation: generation),
+                self.currentLogRequest == requestID, !Task.isCancelled else { return }
+            self.logStreamState = .following
+            var replaceBufferOnFirstChunk = !clearBuffer
             do {
                 for try await chunk in stream {
-                    guard !Task.isCancelled, let self, self.selectedContainerID == id, self.selectedContext == context,
-                        self.configurationGeneration == generation, self.currentDetailRequest == requestID
-                    else { break }
+                    guard !Task.isCancelled, self.selectedContainerID == id,
+                        self.scopeMatches(context, generation: generation), self.currentLogRequest == requestID else { return }
+                    if replaceBufferOnFirstChunk {
+                        self.resetLogs()
+                        replaceBufferOnFirstChunk = false
+                    }
                     self.appendLog(chunk)
                 }
+                guard !Task.isCancelled, self.selectedContainerID == id,
+                    self.scopeMatches(context, generation: generation), self.currentLogRequest == requestID else { return }
+                self.logStreamState = .ended
             } catch is CancellationError {
                 return
             } catch {
-                guard let self, !Task.isCancelled, self.selectedContainerID == id, self.selectedContext == context,
-                    self.configurationGeneration == generation, self.currentDetailRequest == requestID
-                else { return }
-                self.appendLog("\nLog connection ended: \(error.localizedDescription)")
+                guard !Task.isCancelled, self.selectedContainerID == id,
+                    self.scopeMatches(context, generation: generation), self.currentLogRequest == requestID else { return }
+                self.logError = error.localizedDescription
+                self.logStreamState = .failed
             }
         }
     }
@@ -798,6 +902,10 @@ final class AppStore: ObservableObject {
         eventsRequestID = nil
         eventReconciliationTask?.cancel()
         eventReconciliationTask = nil
+        eventResynchronizationTask?.cancel()
+        eventResynchronizationTask = nil
+        eventResynchronizationRequested = false
+        eventStreamID = nil
         inventoryInvalidated = false
         resourcesInvalidated.removeAll()
         liveUpdateError = nil
@@ -809,6 +917,7 @@ final class AppStore: ObservableObject {
         resourceRequestIDs.removeAll()
         resourceInvalidationVersions.removeAll()
         loadingResourceSections.removeAll()
+        resourceErrors.removeAll()
         contextsFetchedAt = nil
         engineInfoFetchedAt = nil
         resourcesFetchedAt.removeAll()
@@ -839,6 +948,7 @@ final class AppStore: ObservableObject {
         snapshotTask?.cancel()
         eventsTask?.cancel()
         eventReconciliationTask?.cancel()
+        eventResynchronizationTask?.cancel()
         stopStatsSubscription()
         engineInfoTask?.cancel()
         for task in resourceTasks.values { task.cancel() }

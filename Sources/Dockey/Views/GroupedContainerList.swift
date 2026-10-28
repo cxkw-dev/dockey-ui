@@ -13,7 +13,12 @@ struct GroupedContainerList: View {
             VStack(spacing: 0) {
                 searchToolbar
                 columns(metricsVisible: metricsVisible)
-                if store.containers.isEmpty && !store.isRefreshing {
+                if store.containers.isEmpty && store.isRefreshing {
+                    VStack(spacing: 12) {
+                        ProgressView().controlSize(.small)
+                        Text("Loading containers…").font(DockeyFonts.ui(12)).foregroundStyle(palette.muted)
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if store.containers.isEmpty {
                     DockeyEmptyState(
                         title: "Your workspace starts here",
                         message:

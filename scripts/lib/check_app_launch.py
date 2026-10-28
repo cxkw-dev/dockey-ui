@@ -162,6 +162,19 @@ def check_layout(source, stage, layout, timeout, resources_only=False):
     if status == 0 or "Dockey bundled font verification failed." not in output:
         raise LaunchCheckError(f"{layout}: missing bundled font was not explicitly rejected")
 
+    missing_icon_directory = stage / f"{layout}-missing-icon"
+    missing_icon_app = copy_app(intact_app, missing_icon_directory)
+    icons = list(resource_bundle(missing_icon_app).rglob("clickhouse-dark.pdf"))
+    if len(icons) != 1 or icons[0].is_symlink():
+        raise LaunchCheckError("expected one real ClickHouse mark inside the app resource bundle")
+    icons[0].unlink()
+    resign_app(missing_icon_app)
+    status, output = launch(
+        missing_icon_app, ["--demo", "--verify-resources"], missing_icon_directory, timeout
+    )
+    if status == 0 or "Dockey bundled service icon verification failed." not in output:
+        raise LaunchCheckError(f"{layout}: missing bundled service mark was not explicitly rejected")
+
     screenshot = intact_directory / "dockey-demo.png"
     arguments = ["--demo", "--verify-resources"]
     if not resources_only:
@@ -176,16 +189,18 @@ def check_layout(source, stage, layout, timeout, resources_only=False):
         raise LaunchCheckError(f"{layout}: intact app exited with status {status}:\n{output}")
     if "Dockey bundled fonts verified." not in output:
         raise LaunchCheckError(f"{layout}: intact app did not confirm font verification")
+    if "Dockey bundled service icons verified." not in output:
+        raise LaunchCheckError(f"{layout}: intact app did not confirm service mark verification")
     if resources_only:
         print(
-            f"Native resources-only check passed ({layout} resources): missing font rejected; "
-            "intact startup, fonts and licenses verified. GUI rendering and PNG export were NOT tested.",
+            f"Native resources-only check passed ({layout} resources): missing font and service mark rejected; "
+            "intact startup, fonts, service marks and licenses verified. GUI rendering and PNG export were NOT tested.",
             flush=True,
         )
         return
     width, height = verify_png(screenshot)
     print(
-        f"Native launch check passed ({layout} resources): missing font rejected; "
+        f"Native launch check passed ({layout} resources): missing font and service mark rejected; "
         f"intact app resources verified; {width}x{height} demo PNG decoded.",
         flush=True,
     )

@@ -9,7 +9,7 @@ Usage: ./scripts/check-app-launch.sh [--app PATH] [--timeout SECONDS] [--resourc
 Defaults: ./dist/Dockey.app and a 30-second limit for each launch.
 
 Copies the app into an isolated temporary location and tests both flat SwiftPM
-and wrapped SwiftBuild resource bundles. Each shape must reject a missing font
+and wrapped SwiftBuild resource bundles. Each shape must reject a missing font and service mark
 and verify that the intact app can launch and export a valid PNG.
 Requires a macOS graphical session and Python 3 for the full default check.
 --resources-only explicitly skips GUI rendering and PNG export; both layouts

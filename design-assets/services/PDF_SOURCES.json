@@ -1,0 +1,86 @@
+{
+  "generator": "generate-vendor-pdfs.py",
+  "cairoSVGVersion": "2.8.2",
+  "cairoVersion": "1.18.6",
+  "metadataDate": "2026-10-28T00:00:00Z",
+  "changes": "Offline vector format conversion only; source viewBox, aspect ratio, geometry and colors preserved. Fixed metadata dates, no paths or usernames.",
+  "upstreamProvenance": [
+    "vendor/SOURCES.json",
+    "library/SOURCES.json",
+    "AI_FOCUS_SOURCE.json"
+  ],
+  "assets": [
+    {
+      "svg": "vendor/clickhouse-light.svg",
+      "svgSHA256": "65304be489dfe7147da5aa48f05c27495f96bac768b377589fb1fa6d3907b3e4",
+      "pdf": "Sources/Dockey/Resources/ServiceIcons/clickhouse-light.pdf",
+      "pdfSHA256": "9537ae8aefa0aa0cc4d783b23364c4363388df39b3a87e4af878093c1d10837a"
+    },
+    {
+      "svg": "vendor/clickhouse-dark.svg",
+      "svgSHA256": "b81b3baf52d5558f063ecff06819a16bc8c86f184b2bc06ab3781d3e251c8313",
+      "pdf": "Sources/Dockey/Resources/ServiceIcons/clickhouse-dark.pdf",
+      "pdfSHA256": "5294b5acd83df806aa13a97b7d18b4b168c398aeb6c5ad3bdac1f74fd157b7cb"
+    },
+    {
+      "svg": "vendor/langfuse-light.svg",
+      "svgSHA256": "2c8ea08641d944f2a50354bf3a07e36ca9c9f698a83b5c06a5e5d3d8838dfb4f",
+      "pdf": "Sources/Dockey/Resources/ServiceIcons/langfuse-light.pdf",
+      "pdfSHA256": "35af0563cdaad0c16642fee9342f4dc53b341e0825182db3484f086dcc31b093"
+    },
+    {
+      "svg": "vendor/langfuse-dark.svg",
+      "svgSHA256": "f7ab304088299eacea633c2dc7f882c90ad981e47ceeb2be66398739f1205356",
+      "pdf": "Sources/Dockey/Resources/ServiceIcons/langfuse-dark.pdf",
+      "pdfSHA256": "0db3b2a1aa428d8d49db8966f44b98b032bfdefcbfa941bdb430dcc5408a7516"
+    },
+    {
+      "svg": "vendor/temporal-light.svg",
+      "svgSHA256": "2a86c5009ae9d7accb329575c2dca4f24d434c3db05b25fb5369bb40af2c2b63",
+      "pdf": "Sources/Dockey/Resources/ServiceIcons/temporal-light.pdf",
+      "pdfSHA256": "cf93330523977d5ed274f1f87b41c31836fb81937c1569b9567cf56706c2b851"
+    },
+    {
+      "svg": "vendor/temporal-dark.svg",
+      "svgSHA256": "d32e0b9adca9924d8ccb98b54d16fd933f69a261a698471df5030fa0c04f8c84",
+      "pdf": "Sources/Dockey/Resources/ServiceIcons/temporal-dark.pdf",
+      "pdfSHA256": "d5f0096727097f1d32d08bcaeaa02aacd02f6271ed49d0391f951284b6144f60"
+    },
+    {
+      "svg": "vendor/mongodb-light.svg",
+      "svgSHA256": "b40d855394ebf3480b02a27c063128f347573c93dd2b63cf0ee8f8ab5b5bcc1e",
+      "pdf": "Sources/Dockey/Resources/ServiceIcons/mongodb-light.pdf",
+      "pdfSHA256": "aec7fffa332ec170027690fb6504657081c3179e1fae9b91efbcc5016f1f2f12"
+    },
+    {
+      "svg": "vendor/mongodb-dark.svg",
+      "svgSHA256": "5cc2e4cdb9905735b925f179681ee17df4c513811afc7b8494521228a61ec244",
+      "pdf": "Sources/Dockey/Resources/ServiceIcons/mongodb-dark.pdf",
+      "pdfSHA256": "61e7e0d3c06db5c9dd5fd6158576f64eff5b4a973d0ec5549b8365547edf84e1"
+    },
+    {
+      "svg": "postgresql-light.svg",
+      "svgSHA256": "1daf4a8ae7e7327c0046e01fb4f7938999792ee7459e111530f0e36eebcd278a",
+      "pdf": "Sources/Dockey/Resources/ServiceIcons/postgresql-light.pdf",
+      "pdfSHA256": "676bddab6abaea0ec36a0ddff9a787fb6b2b6964265edb4a535a899bd16cf065"
+    },
+    {
+      "svg": "postgresql-dark.svg",
+      "svgSHA256": "5b42a1ab8d2c3b184c547ff52f7ddf7d122e5010fc2df932bbfb8bb757936a22",
+      "pdf": "Sources/Dockey/Resources/ServiceIcons/postgresql-dark.pdf",
+      "pdfSHA256": "82f29584e1700c300a04efe7738724d37a27dcd188716e6458da4ae9a41151dd"
+    },
+    {
+      "svg": "ai-focus-light.svg",
+      "svgSHA256": "fa3e3bfa1cc89fbfaab8bf451ed668a223ef9db19095f2efdb39b5a88ad681e6",
+      "pdf": "Sources/Dockey/Resources/ServiceIcons/ai-focus-light.pdf",
+      "pdfSHA256": "a8aa81cfe6fdde9d6d607475d9037015bb664e405454de6b34bc562825a270fd"
+    },
+    {
+      "svg": "ai-focus-dark.svg",
+      "svgSHA256": "b5466826f864e1c3a1e641719828ae785cc8833d5a25c81dfee056dba24662fa",
+      "pdf": "Sources/Dockey/Resources/ServiceIcons/ai-focus-dark.pdf",
+      "pdfSHA256": "6baceaefc2c1e4830593cc013d4bb020608c1021f44eb39692be753f02ae72be"
+    }
+  ]
+}

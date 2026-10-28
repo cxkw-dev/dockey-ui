@@ -128,6 +128,7 @@ struct RootView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(store.selectedSection == section ? palette.primary : palette.muted)
                 .accessibilityIdentifier("navigation-\(section.rawValue)")
+                .accessibilityAddTraits(store.selectedSection == section ? .isSelected : [])
             }
 
             if !composeGroups.isEmpty {

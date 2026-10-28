@@ -139,7 +139,16 @@ enum DockerParsing {
                 let isHealthHistoryOutput =
                     normalized == "output"
                     && path.suffix(3).map { $0.lowercased() } == ["state", "health", "log"]
-                if ["password", "secret", "token", "credential", "authorization", "privatekey", "apikey"].contains(
+                let isOpaqueDriverOptions =
+                    ["driveropts", "driveroptions"].contains(normalized)
+                    || (normalized == "options"
+                        && (path.last?.lowercased() == "driverconfig"
+                            || dictionary.keys.contains { $0.lowercased() == "driver" }))
+                if normalized == "labels" || isOpaqueDriverOptions {
+                    // Opaque values may contain URL credentials or CSV mount options even
+                    // when their keys are innocuous. Retain keys/shape without their values.
+                    result[key] = redactOpaqueValues(entry.value)
+                } else if ["password", "secret", "token", "credential", "authorization", "privatekey", "apikey"].contains(
                     where: normalized.contains)
                     || ["auth", "args", "cmd", "entrypoint"].contains(normalized)
                     || (path.last?.lowercased() == "healthcheck" && normalized == "test")
@@ -158,6 +167,12 @@ enum DockerParsing {
         }
         if let array = value as? [Any] { return array.map { redact($0, path: path) } }
         return value
+    }
+
+    private static func redactOpaqueValues(_ value: Any) -> Any {
+        if let dictionary = value as? [String: Any] { return dictionary.mapValues(redactOpaqueValues) }
+        if let array = value as? [Any] { return array.map(redactOpaqueValues) }
+        return "<redacted>"
     }
 
     private static func nonempty(_ value: String?) -> String? {

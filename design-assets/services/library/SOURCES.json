@@ -1,0 +1,18 @@
+{
+  "repository": "lucide-icons/lucide-lab",
+  "commit": "34b6526d0a67bbe67b8a54b9b101018b1377ef28",
+  "source": "https://raw.githubusercontent.com/lucide-icons/lucide-lab/34b6526d0a67bbe67b8a54b9b101018b1377ef28/icons/elephant.svg",
+  "sourceSHA256": "69b01bf5dc7be96a9a115c562b15b45235cb58485033cc410b45ddb8f5e55805",
+  "license": "ISC",
+  "licenseFile": "Lucide-Lab-ISC.txt",
+  "contributors": [
+    "danielbayley",
+    "karsa-mistmere"
+  ],
+  "usage": "General elephant illustration for PostgreSQL image identification, not the PostgreSQL vendor mark.",
+  "changes": "All upstream path geometry and viewBox unchanged. Set theme-gray stroke color and stroke width 1.5 instead of 2 for compact UI. Rendered as native vector PDF offline.",
+  "themeReferences": [
+    "../postgresql-light.svg",
+    "../postgresql-dark.svg"
+  ]
+}

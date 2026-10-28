@@ -177,7 +177,8 @@ public actor DockerClient {
             let tag = item["Tag"] as? String ?? "<none>"
             return ImageSummary(
                 id: "\(imageID)|\(repository):\(tag)", repository: repository, tag: tag,
-                size: item["Size"] as? String ?? "—", createdSince: item["CreatedSince"] as? String ?? "")
+                size: item["Size"] as? String ?? "—", createdSince: item["CreatedSince"] as? String ?? "",
+                imageID: imageID)
         }.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
     }
 

@@ -1,78 +1,47 @@
+import AppKit
 import DockeyCore
 import SwiftUI
 
-/// Original Dockey service illustrations, not vendor logos or authenticity indicators.
-/// Matching editable SVG references live in design-assets/services/.
+/// Reviewed vendor marks and the ISC-licensed elephant use cached native vector PDFs.
+/// Source artwork and provenance live in design-assets/services/.
+@MainActor
 struct ServiceIcon: View {
     let identity: ServiceIdentity
     var size: CGFloat = 24
     @Environment(\.colorScheme) private var scheme
 
     private var colors: ServiceIconColors { ServiceIconColors(dark: scheme == .dark) }
+    // Balance visible weight: dense solid bars need less space than open outlines or a narrow leaf.
+    private var opticalSize: CGFloat {
+        switch identity {
+        case .clickhouse: size * 18 / 24
+        case .langfuse, .temporal, .postgresql, .aiFocus: size * 22 / 24
+        case .mongodb: size * 23 / 24
+        default: size
+        }
+    }
 
     var body: some View {
         let colors = colors
-        Canvas { context, canvasSize in
-            var context = context
-            let scale = min(canvasSize.width, canvasSize.height) / 24
-            context.scaleBy(x: scale, y: scale)
-            switch identity {
-            case .clickhouse: analytics(context, colors: colors)
-            case .mongodb: document(context, colors: colors)
-            case .redis: cache(context, colors: colors)
-            case .postgresql: elephant(context, colors: colors)
-            case .generic: container(context, colors: colors)
+        Group {
+            if let image = ServiceIconResources.image(for: identity, dark: scheme == .dark) {
+                Image(nsImage: image).resizable().renderingMode(.original).scaledToFit()
+                    .frame(width: opticalSize, height: opticalSize)
+            } else {
+                Canvas { context, canvasSize in
+                    var context = context
+                    let scale = min(canvasSize.width, canvasSize.height) / 24
+                    context.scaleBy(x: scale, y: scale)
+                    switch identity {
+                    case .redis: cache(context, colors: colors)
+                    default: container(context, colors: colors)
+                    }
+                }
             }
         }
         .frame(width: size, height: size)
         .help(identity == .generic ? "Container image" : "\(identity.displayName) image")
         .accessibilityHidden(true)
-    }
-
-    private func analytics(_ context: GraphicsContext, colors: ServiceIconColors) {
-        // A compact bar chart, intentionally unrelated to any vendor's logo geometry.
-        for rect in [
-            CGRect(x: 3.5, y: 11, width: 4, height: 9.5),
-            CGRect(x: 10, y: 3.5, width: 4, height: 17),
-            CGRect(x: 16.5, y: 7.5, width: 4, height: 13),
-        ] {
-            context.fill(Path(roundedRect: rect, cornerRadius: 1.25), with: .color(colors.accent))
-        }
-    }
-
-    private func document(_ context: GraphicsContext, colors: ServiceIconColors) {
-        var page = Path()
-        page.move(to: CGPoint(x: 8, y: 3.5))
-        page.addLine(to: CGPoint(x: 13.5, y: 3.5))
-        page.addLine(to: CGPoint(x: 17.5, y: 7.5))
-        page.addLine(to: CGPoint(x: 17.5, y: 18.5))
-        page.addQuadCurve(to: CGPoint(x: 15.5, y: 20.5), control: CGPoint(x: 17.5, y: 20.5))
-        page.addLine(to: CGPoint(x: 8, y: 20.5))
-        page.addQuadCurve(to: CGPoint(x: 6, y: 18.5), control: CGPoint(x: 6, y: 20.5))
-        page.addLine(to: CGPoint(x: 6, y: 5.5))
-        page.addQuadCurve(to: CGPoint(x: 8, y: 3.5), control: CGPoint(x: 6, y: 3.5))
-        page.closeSubpath()
-        context.fill(page, with: .color(colors.accent.opacity(0.1)))
-        context.stroke(page, with: .color(colors.accent), style: StrokeStyle(lineWidth: 1.25, lineJoin: .round))
-        var fold = Path()
-        fold.move(to: CGPoint(x: 13.5, y: 3.5))
-        fold.addLine(to: CGPoint(x: 13.5, y: 7.5))
-        fold.addLine(to: CGPoint(x: 17.5, y: 7.5))
-        context.stroke(fold, with: .color(colors.accent), style: StrokeStyle(lineWidth: 1.1, lineJoin: .round))
-        var leaf = Path()
-        leaf.move(to: CGPoint(x: 9, y: 15.5))
-        leaf.addCurve(
-            to: CGPoint(x: 14.8, y: 10),
-            control1: CGPoint(x: 7.7, y: 11.8), control2: CGPoint(x: 11, y: 9.7))
-        leaf.addCurve(
-            to: CGPoint(x: 9, y: 15.5),
-            control1: CGPoint(x: 15.1, y: 13.8), control2: CGPoint(x: 12.1, y: 17.1))
-        leaf.closeSubpath()
-        context.fill(leaf, with: .color(colors.accent))
-        var vein = Path()
-        vein.move(to: CGPoint(x: 9.5, y: 15))
-        vein.addLine(to: CGPoint(x: 13.4, y: 11.3))
-        context.stroke(vein, with: .color(colors.surface), style: StrokeStyle(lineWidth: 0.85, lineCap: .round))
     }
 
     private func cache(_ context: GraphicsContext, colors: ServiceIconColors) {
@@ -88,29 +57,6 @@ struct ServiceIcon: View {
             contents.move(to: CGPoint(x: 10, y: y + 2))
             contents.addLine(to: CGPoint(x: 17.3, y: y + 2))
             context.stroke(contents, with: .color(colors.accent), style: StrokeStyle(lineWidth: 1.1, lineCap: .round))
-        }
-    }
-
-    private func elephant(_ context: GraphicsContext, colors: ServiceIconColors) {
-        // A new front-facing character built from simple ovals and a rounded head.
-        for x in [3.3, 13.9] {
-            let ear = Path(ellipseIn: CGRect(x: x, y: 7.9, width: 6.8, height: 9.2))
-            context.fill(ear, with: .color(colors.accent.opacity(0.18)))
-            context.stroke(ear, with: .color(colors.accent), lineWidth: 1.2)
-        }
-        context.fill(
-            Path(roundedRect: CGRect(x: 7.2, y: 5.5, width: 9.6, height: 12.4), cornerRadius: 4.8),
-            with: .color(colors.accent))
-        var trunk = Path()
-        trunk.move(to: CGPoint(x: 12, y: 14.5))
-        trunk.addLine(to: CGPoint(x: 12, y: 18.5))
-        trunk.addQuadCurve(to: CGPoint(x: 14.4, y: 21), control: CGPoint(x: 12, y: 21))
-        trunk.addQuadCurve(to: CGPoint(x: 16.8, y: 18.6), control: CGPoint(x: 16.8, y: 21))
-        context.stroke(trunk, with: .color(colors.accent), style: StrokeStyle(lineWidth: 3.2, lineCap: .round))
-        for x in [9.8, 14.2] {
-            context.fill(
-                Path(ellipseIn: CGRect(x: x - 0.75, y: 9.65, width: 1.5, height: 1.5)),
-                with: .color(Color(hex: 0xFAFAFA)))
         }
     }
 
@@ -138,6 +84,85 @@ struct ServiceIcon: View {
 
 private struct ServiceIconColors {
     let dark: Bool
-    var surface: Color { Color(hex: dark ? 0x0A0A0A : 0xFFFFFF) }
     var accent: Color { Color(hex: dark ? 0xB8B8B8 : 0x626262) }
+}
+
+/// AppKit's PDF representation preserves vectors on every supported macOS version.
+/// Each theme asset is decoded once; list updates never re-read or re-parse artwork.
+@MainActor
+enum ServiceIconResources {
+    private static let bundledNames = ["clickhouse", "langfuse", "temporal", "mongodb", "postgresql", "ai-focus"]
+    private static let licenses = [
+        "ClickHouse-Apache-2.0.txt", "Langfuse-MIT.txt", "Temporal-MIT.txt", "MongoDB-LeafyGreen-Apache-2.0.txt",
+        "Lucide-Lab-ISC.txt",
+    ]
+    private static var images: [String: NSImage] = [:]
+    private static var failedNames: Set<String> = []
+    private static let resources: URL? = {
+        let bundleURL: URL
+        if Bundle.main.bundleURL.pathExtension == "app" {
+            guard let directory = Bundle.main.resourceURL else { return nil }
+            bundleURL = directory.appendingPathComponent("Dockey_Dockey.bundle")
+        } else {
+            bundleURL = Bundle.module.bundleURL
+        }
+        return ["Contents/Resources/Resources", "Resources"]
+            .map { bundleURL.appendingPathComponent($0, isDirectory: true) }
+            .first { FileManager.default.fileExists(atPath: $0.appendingPathComponent("ServiceIcons").path) }
+    }()
+
+    static func image(for identity: ServiceIdentity, dark: Bool) -> NSImage? {
+        guard bundledNames.contains(identity.rawValue) else { return nil }
+        return image(named: "\(identity.rawValue)-\(dark ? "dark" : "light")")
+    }
+
+    private static func image(named name: String) -> NSImage? {
+        if let image = images[name] { return image }
+        guard !failedNames.contains(name) else { return nil }
+        guard let directory = resources?.appendingPathComponent("ServiceIcons"),
+            let image = NSImage(contentsOf: directory.appendingPathComponent("\(name).pdf")), image.isValid,
+            image.size.width > 0, image.size.height > 0
+        else {
+            failedNames.insert(name)
+            return nil
+        }
+        image.isTemplate = false
+        images[name] = image
+        return image
+    }
+
+    static func verifyBundledAssets() throws {
+        guard Bundle.main.bundleURL.pathExtension == "app", let resources else {
+            throw CocoaError(.fileReadNoSuchFile)
+        }
+        for service in bundledNames {
+            for theme in ["dark", "light"] {
+                let name = "\(service)-\(theme)"
+                let directory = resources.appendingPathComponent("ServiceIcons")
+                guard let svg = try? Data(contentsOf: directory.appendingPathComponent("\(name).svg")), !svg.isEmpty,
+                    let pdf = try? Data(contentsOf: directory.appendingPathComponent("\(name).pdf")),
+                    pdf.starts(with: Data("%PDF-".utf8)), let image = image(named: name), rasterizes(image)
+                else { throw CocoaError(.fileReadCorruptFile) }
+            }
+        }
+        for license in licenses {
+            let url = resources.appendingPathComponent("ServiceIconLicenses/\(license)")
+            guard let data = try? Data(contentsOf: url), !data.isEmpty else { throw CocoaError(.fileReadNoSuchFile) }
+        }
+    }
+
+    private static func rasterizes(_ image: NSImage) -> Bool {
+        var rect = CGRect(x: 0, y: 0, width: 96, height: 96)
+        guard let cgImage = image.cgImage(forProposedRect: &rect, context: nil, hints: nil) else { return false }
+        var pixels = [UInt8](repeating: 0, count: 96 * 96 * 4)
+        let drew = pixels.withUnsafeMutableBytes { bytes -> Bool in
+            guard let context = CGContext(data: bytes.baseAddress, width: 96, height: 96, bitsPerComponent: 8,
+                bytesPerRow: 96 * 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue)
+            else { return false }
+            context.draw(cgImage, in: rect)
+            return true
+        }
+        return drew && stride(from: 3, to: pixels.count, by: 4).contains { pixels[$0] > 0 }
+    }
 }

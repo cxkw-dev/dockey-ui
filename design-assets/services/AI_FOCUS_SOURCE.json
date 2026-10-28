@@ -1,0 +1,31 @@
+{
+  "source": "AI Focus current application icon supplied by the project owner",
+  "sourceFile": "icon-source.png",
+  "sourceSHA256": "8d8c7e3dd5f8f634a5d07dc53d07cdbcf9a2104d104e443c5d6a3484ae37b2c8",
+  "license": "Project-owned artwork distributed with Dockey under Apache-2.0",
+  "changes": "Extracted only the black F foreground from the current yellow-backed app icon; vectorized its silhouette, cropped the viewport to the glyph, and selected neutral monochrome foregrounds. No source-image metadata or host paths retained.",
+  "tracer": {
+    "pythonPackage": "vtracer 0.6.15",
+    "engineReported": "0.6.12",
+    "mask": "max(R,G,B) < 128",
+    "options": {
+      "colormode": "binary",
+      "mode": "spline",
+      "filter_speckle": 8,
+      "corner_threshold": 60,
+      "length_threshold": 3.0,
+      "splice_threshold": 45,
+      "path_precision": 3
+    }
+  },
+  "assets": [
+    {
+      "file": "ai-focus-dark.svg",
+      "sha256": "b5466826f864e1c3a1e641719828ae785cc8833d5a25c81dfee056dba24662fa"
+    },
+    {
+      "file": "ai-focus-light.svg",
+      "sha256": "fa3e3bfa1cc89fbfaab8bf451ed668a223ef9db19095f2efdb39b5a88ad681e6"
+    }
+  ]
+}

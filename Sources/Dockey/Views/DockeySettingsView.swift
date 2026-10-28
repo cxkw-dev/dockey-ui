@@ -37,6 +37,7 @@ struct DockeySettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(selected == section ? palette.primary : palette.muted)
+                    .accessibilityAddTraits(selected == section ? .isSelected : [])
                 }
                 Spacer()
                 Text(store.isDemo ? "Demo · sample data" : "Dockey preferences")
@@ -304,7 +305,7 @@ struct DockeySettingsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     DockeyWordmark(size: 29)
                     Text(
-                        "Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.1")"
+                        "Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.2")"
                     )
                     .font(DockeyFonts.ui(11)).foregroundStyle(palette.muted)
                 }

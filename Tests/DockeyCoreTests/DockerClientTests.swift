@@ -76,17 +76,20 @@ struct DockerClientTests {
     }
 
     @Test func untaggedAndMultiTaggedImagesHaveStableDistinctDisplayIDs() async throws {
+        let engineID = "sha256:" + idA
         let runner = StubRunner([
             local,
             CommandOutput(
                 stdout: """
-                    {"ID":"sha256:fixture","Repository":"fixture","Tag":"v1","Size":"12MB","CreatedSince":"1 day ago"}
-                    {"ID":"sha256:fixture","Repository":"fixture","Tag":"latest","Size":"12MB","CreatedSince":"1 day ago"}
+                    {"ID":"\(engineID)","Repository":"fixture","Tag":"v1","Size":"12MB","CreatedSince":"1 day ago"}
+                    {"ID":"\(engineID)","Repository":"fixture","Tag":"latest","Size":"12MB","CreatedSince":"1 day ago"}
                     """),
         ])
         let images = try await client(runner).images(context: "fixture")
         #expect(images.count == 2)
         #expect(Set(images.map(\.id)).count == 2)
+        #expect(images.map(\.imageID) == [engineID, engineID])
+        #expect(!images.contains { $0.id == $0.imageID })
         #expect(images.map(\.displayName) == ["fixture:latest", "fixture:v1"])
     }
 
@@ -161,6 +164,34 @@ struct DockerParsingTests {
         #expect(inspection.json.contains("<redacted>"))
         #expect(inspection.json.contains("2026-01-01"))
         #expect(inspection.json.contains("ExitCode"))
+    }
+
+    @Test func opaqueLabelAndDriverOptionValuesAreRedactedWithoutChangingGrouping() throws {
+        let raw = #"""
+            [{"Id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","Name":"/fixture-api",
+              "Config":{"Image":"fixture:latest","Labels":{"com.docker.compose.project":"fixture",
+                "com.docker.compose.service":"api","connection":"postgresql://user:fixture-url-secret@db/app"}},
+              "State":{"Status":"running"},
+              "HostConfig":{"Mounts":[{"VolumeOptions":{"DriverConfig":{"Name":"local","Options":{
+                "o":"addr=server,username=user,password=fixture-csv-secret","device":"//server/share"}}}}],
+                "DeviceRequests":[{"Driver":"fixture","Options":{"endpoint":"https://user:fixture-device-secret@example.test"}}]},
+              "NetworkSettings":{"Networks":{"fixture":{"DriverOpts":{"session":"Bearer fixture-driver-secret"}}}}}]
+            """#
+        let inspection = try DockerParsing.inspection(raw)
+        for secret in ["fixture-url-secret", "fixture-csv-secret", "fixture-device-secret", "fixture-driver-secret"] {
+            #expect(!inspection.json.contains(secret))
+        }
+        let shown = try #require(JSONSerialization.jsonObject(with: Data(inspection.json.utf8)) as? [String: Any])
+        let config = try #require(shown["Config"] as? [String: Any])
+        let labels = try #require(config["Labels"] as? [String: String])
+        #expect(Set(labels.keys) == ["com.docker.compose.project", "com.docker.compose.service", "connection"])
+        #expect(labels.values.allSatisfy { $0 == "<redacted>" })
+        #expect(inspection.json.contains("DriverConfig"))
+        #expect(inspection.json.contains("DriverOpts"))
+        #expect(inspection.json.contains("device"))
+        let containers = try DockerParsing.containers(raw)
+        #expect(containers.first?.project == "fixture")
+        #expect(containers.first?.service == "api")
     }
 
     @Test func percentagesUseNumbersAndMalformedValuesStayFinite() throws {

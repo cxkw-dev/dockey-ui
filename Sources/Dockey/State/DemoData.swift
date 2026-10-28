@@ -12,10 +12,11 @@ enum DemoData {
         container("api", project: "storefront", image: "storefront-api:dev", port: 8080),
         container("postgres", project: "storefront", image: "postgres:17-alpine", port: 5432),
         container("worker", project: "storefront", image: "storefront-worker:dev", state: .exited),
-        container("api", project: "analytics", image: "analytics-api:latest", health: .unhealthy, port: 9000),
+        container("langfuse", project: "analytics", image: "langfuse/langfuse:3", health: .unhealthy, port: 3001),
         container("clickhouse", project: "analytics", image: "clickhouse:25-alpine", port: 8123),
-        container("scheduler", project: "analytics", image: "analytics-jobs:latest"),
+        container("temporal", project: "analytics", image: "temporalio/server:1.29", port: 7233),
         container("redis-local", image: "redis:8-alpine", port: 6379),
+        container("ai-focus", image: "ai-focus:latest", port: 4444),
         container("documents-local", image: "mongo:8", port: 27017),
         container("mailpit", image: "axllent/mailpit:latest", state: .exited, port: 8025),
     ]
@@ -53,9 +54,16 @@ enum DemoData {
             id: "demo-postgres", repository: "postgres", tag: "17-alpine", size: "277 MB", createdSince: "4 days ago"),
         ImageSummary(id: "demo-redis", repository: "redis", tag: "8-alpine", size: "42 MB", createdSince: "1 week ago"),
         ImageSummary(id: "demo-mongo", repository: "mongo", tag: "8", size: "312 MB", createdSince: "3 days ago"),
+        ImageSummary(id: "demo-ai-focus", repository: "ai-focus", tag: "latest", size: "186 MB", createdSince: "1 day ago"),
         ImageSummary(
             id: "demo-clickhouse", repository: "clickhouse", tag: "25-alpine", size: "284 MB",
             createdSince: "2 days ago"),
+        ImageSummary(
+            id: "demo-langfuse", repository: "langfuse/langfuse", tag: "3", size: "612 MB",
+            createdSince: "1 day ago"),
+        ImageSummary(
+            id: "demo-temporal", repository: "temporalio/server", tag: "1.29", size: "206 MB",
+            createdSince: "3 days ago"),
     ]
     static let volumes = [
         VolumeSummary(

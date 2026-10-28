@@ -41,7 +41,7 @@ A group action starts/stops/restarts the selected existing containers. It is a b
 
 Views observe a main-actor store; Docker execution stays in the core actor/process layer. Pending IDs disable duplicate lifecycle actions. After initial discovery, a context-scoped Docker event stream drives state reconciliation instead of periodic inventory polling. A separate stats stream runs only while metrics are useful and the app is active. The store owns discovery, event, metric, and log tasks so selection changes, window closure, and cancellation can end old work rather than leaving a child process behind. [Live updates and performance](performance.md) describes the cache and reconnect behavior.
 
-Logs have a bounded tail and session display buffer. Inspection is redacted before display/export, including environment values and sensitive fields. Redaction is a defense in depth measure, not a guarantee that arbitrary user logs are safe to publish. Logs are not uploaded or included in documentation captures.
+Logs have a bounded tail and session display buffer. Inspection is redacted before display/export, including environment values, known credential fields, and opaque label/driver-option values. Review copied inspection before sharing: arbitrary application data can contain secrets outside recognized fields. Logs are not uploaded or included in documentation captures.
 
 The first settings surface contains functional application preferences. Runtime editing, terminal execution, resource deletion, and automatic updating are documented as later work rather than represented by inert controls.
 

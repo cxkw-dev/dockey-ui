@@ -82,6 +82,74 @@ struct ServiceIdentityTests {
         }
     }
 
+    @Test func recognizesLangfuseWebAndWorkerOnVerifiedRegistryPaths() {
+        let digest = "sha256:" + String(repeating: "a", count: 64)
+        let examples = [
+            "langfuse/langfuse:3", "langfuse/langfuse-worker:3",
+            "docker.io/langfuse/langfuse:4", "index.docker.io/langfuse/langfuse-worker:4",
+            "ghcr.io/langfuse/langfuse:3", "ghcr.io/langfuse/langfuse-worker:4",
+            "GHCR.IO/langfuse/langfuse:4", "ghcr.io/langfuse/langfuse-worker@\(digest)",
+            "docker.langfuse.com/langfuse/langfuse:4",
+            "docker.langfuse.com/langfuse/langfuse-worker:4@\(digest)",
+        ]
+        for image in examples {
+            #expect(ServiceIdentity(imageReference: image) == .langfuse, "Image: \(image)")
+        }
+    }
+
+    @Test func recognizesExactTemporalServerDevelopmentToolsAndUIRepositories() {
+        let digest = "sha256:" + String(repeating: "b", count: 64)
+        let examples = [
+            "temporalio/auto-setup:1.29", "temporalio/server:1.30", "temporalio/temporal:latest",
+            "temporalio/admin-tools:1.30", "temporalio/ui:2",
+            "docker.io/temporalio/server:1.30@\(digest)",
+            "registry-1.docker.io/temporalio/ui@\(digest)",
+        ]
+        for image in examples {
+            #expect(ServiceIdentity(imageReference: image) == .temporal, "Image: \(image)")
+        }
+    }
+
+    @Test func additionalRegistriesDoNotExtendTrustToOtherRepositoriesOrConfusableBrands() {
+        let examples = [
+            "langfuse:3", "langfuse-worker:3", "temporal:latest", "temporalio:latest",
+            "company/langfuse:3", "company/temporal:latest", "langfuse/langfuse-worker-backup:3",
+            "temporalio/server-custom:1", "temporalio/ui-evil:2", "company/temporalio/server:1",
+            "ghcr.io/company/langfuse:3", "ghcr.io/temporalio/server:1", "ghcr.io/library/redis:8",
+            "ghcr.io.evil.test/langfuse/langfuse:3", "ghcr.io:5000/langfuse/langfuse:3",
+            "evil.test/langfuse/langfuse:3", "evil.test/temporalio/server:1",
+            "docker.langfuse.com.evil.test/langfuse/langfuse:4",
+            "docker.langfuse.com:443/langfuse/langfuse:4", "docker.langfuse.com/library/postgres:17",
+            "docker.langfuse.com/temporalio/server:1", "docker.langfuse.com/langfuse/langfuse-evil:4",
+            "library/langfuse:3", "arm64v8/langfuse:3", "arm64v8/temporal:latest",
+        ]
+        for image in examples {
+            #expect(ServiceIdentity(imageReference: image) == .generic, "Unverified repository: \(image)")
+        }
+    }
+
+    @Test func recognizesTheConfirmedLocalAIFocusImageWithTagsAndDigests() {
+        let digest = "sha256:" + String(repeating: "c", count: 64)
+        for image in ["ai-focus", "ai-focus:latest", "ai-focus:v1.0.0", "ai-focus@\(digest)", "ai-focus:latest@\(digest)"] {
+            #expect(ServiceIdentity(imageReference: image) == .aiFocus, "Image: \(image)")
+        }
+        #expect(ServiceIdentity.aiFocus.id == "ai-focus")
+        #expect(ServiceIdentity.aiFocus.displayName == "AI Focus")
+    }
+
+    @Test func localAIFocusIdentityDoesNotApplyToRegistryCopiesOrSimilarServiceNames() {
+        let examples = [
+            "my-ai-focus:latest", "ai-focus-backend:latest", "ai-focus-mcp:latest", "aifocus:latest",
+            "acme/ai-focus:latest", "ai-focus/api:latest", "library/ai-focus:latest", "arm64v8/ai-focus:latest",
+            "docker.io/ai-focus:latest", "docker.io/library/ai-focus:latest", "index.docker.io/ai-focus:latest",
+            "registry.example.com/ai-focus:latest", "localhost:5000/ai-focus:latest", "ghcr.io/acme/ai-focus:latest",
+            "docker.langfuse.com/ai-focus:latest", "ai-focus:", "AI-FOCUS:latest",
+        ]
+        for image in examples {
+            #expect(ServiceIdentity(imageReference: image) == .generic, "Different or malformed app image: \(image)")
+        }
+    }
+
     @Test func malformedReferencesDoNotAcquireBrandIdentity() {
         let validDigest = "sha256:" + String(repeating: "a", count: 64)
         let examples = [

@@ -24,6 +24,9 @@ class ResourceLayoutTests(unittest.TestCase):
             fonts = launch_check.resource_bundle(app) / "Resources/Fonts"
             fonts.mkdir(parents=True)
             (fonts / "Geist-Regular.ttf").write_bytes(b"fixture font")
+            icons = fonts.parent / "ServiceIcons"
+            icons.mkdir()
+            (icons / "clickhouse-dark.pdf").write_bytes(b"fixture mark")
             stage = root / "stage"
             stage.mkdir()
 
@@ -35,7 +38,8 @@ class ResourceLayoutTests(unittest.TestCase):
 
             responses = [
                 (1, "Dockey bundled font verification failed."),
-                (intact_status, "Dockey bundled fonts verified."),
+                (1, "Dockey bundled service icon verification failed."),
+                (intact_status, "Dockey bundled fonts verified.\nDockey bundled service icons verified."),
             ]
             with mock.patch.object(launch_check, "copy_app", side_effect=copy_fixture), \
                 mock.patch.object(launch_check, "resign_app"), \
@@ -46,12 +50,14 @@ class ResourceLayoutTests(unittest.TestCase):
                 else:
                     with self.assertRaises(launch_check.LaunchCheckError):
                         launch_check.check_layout(app, stage, "flat", 1, resources_only=True)
-                self.assertEqual(launch.call_count, 2)
+                self.assertEqual(launch.call_count, 3)
                 for call in launch.call_args_list:
                     self.assertEqual(call.args[1], ["--demo", "--verify-resources"])
                 png.assert_not_called()
                 broken = stage / "flat-missing-font/Dockey.app"
                 self.assertEqual(list(launch_check.resource_bundle(broken).rglob("Geist-Regular.ttf")), [])
+                missing_icon = stage / "flat-missing-icon/Dockey.app"
+                self.assertEqual(list(launch_check.resource_bundle(missing_icon).rglob("clickhouse-dark.pdf")), [])
 
     def test_resources_only_skips_gui_but_keeps_negative_and_intact_startup_checks(self):
         self.exercise_resources_only(intact_status=0)
@@ -76,8 +82,11 @@ class ResourceLayoutTests(unittest.TestCase):
                             "Fonts/Geist-Regular.ttf": b"font fixture bytes",
                             "Fonts/Geist-OFL.txt": b"license fixture bytes",
                             "dockey-mark.svg": b"artwork fixture bytes",
+                            "ServiceIcons/clickhouse-dark.pdf": b"service mark fixture bytes",
+                            "ServiceIconLicenses/ClickHouse-Apache-2.0.txt": b"service license fixture bytes",
                         }
                         for name, contents in files.items():
+                            (payload / name).parent.mkdir(parents=True, exist_ok=True)
                             (payload / name).write_bytes(contents)
                         executable = app / "Contents/MacOS/Dockey"
                         executable.parent.mkdir(parents=True)

@@ -88,7 +88,6 @@ struct ContainerDetailView: View {
             detailContent
         }
         .preference(key: DockeyMetricsVisibilityKey.self, value: container.isRunning)
-        .onChange(of: store.detailTab) { _, _ in Task { await store.refreshDetail() } }
     }
 
     private var shouldStop: Bool { [.running, .paused, .restarting].contains(container.state) }
@@ -162,7 +161,15 @@ struct ContainerDetailView: View {
                 .accessibilityLabel("Copy displayed logs")
             }
             .padding(.horizontal, 26).padding(.vertical, 15)
-            if store.logText.isEmpty {
+            if let error = store.logError {
+                DockeyFailureView(title: "Log connection interrupted", message: error) { store.retryLogs() }
+            }
+            if store.logText.isEmpty && store.logStreamState == .connecting {
+                ProgressView("Connecting to container logs…").controlSize(.small)
+                    .font(DockeyFonts.ui(11)).frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if store.logText.isEmpty && store.logError != nil {
+                Spacer(minLength: 0)
+            } else if store.logText.isEmpty {
                 DockeyEmptyState(
                     title: "No log output yet",
                     message: "Output appears here when this container writes to stdout or stderr.",
@@ -174,11 +181,8 @@ struct ContainerDetailView: View {
                     follow: followLogs && logSearch.isEmpty, palette: palette)
             }
             HStack(spacing: 7) {
-                Circle().fill(container.isRunning ? palette.green : palette.muted).frame(width: 5, height: 5)
-                Text(
-                    store.isDemo
-                        ? "Sample log output" : container.isRunning ? "Following container output" : "Container stopped"
-                )
+                Circle().fill(store.logStreamState == .failed ? palette.amber : store.logStreamState == .following ? palette.green : palette.muted).frame(width: 5, height: 5)
+                Text(logStatus)
                 Spacer()
                 Text("Bounded session buffer")
             }
@@ -188,10 +192,38 @@ struct ContainerDetailView: View {
         }
     }
 
+    private var logStatus: String {
+        if store.isDemo { return "Sample log output" }
+        switch store.logStreamState {
+        case .idle: return "Logs not connected"
+        case .connecting: return "Connecting to container output"
+        case .following: return "Following container output"
+        case .ended: return container.isRunning ? "Log connection ended" : "Container stopped · log output complete"
+        case .failed: return "Log connection interrupted"
+        }
+    }
+
+    @ViewBuilder
+    private var inspectionStatus: some View {
+        if let error = store.inspectionError {
+            DockeyFailureView(title: store.inspection == nil ? "Inspection unavailable" : "Inspection may be out of date",
+                message: error, isRetrying: store.isLoadingInspection) {
+                Task { await store.retryInspection() }
+            }
+        } else if store.isLoadingInspection {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Loading inspection…").font(DockeyFonts.ui(11)).foregroundStyle(palette.muted)
+                Spacer()
+            }.padding(.horizontal, 26).padding(.vertical, 12)
+        }
+    }
+
     private var inspectionContent: some View {
         VStack(spacing: 0) {
+            inspectionStatus
             HStack {
-                Text("Environment values and sensitive fields are redacted.").font(DockeyFonts.ui(11)).foregroundStyle(
+                Text("Known credential fields are redacted. Review before sharing.").font(DockeyFonts.ui(11)).foregroundStyle(
                     palette.muted)
                 Spacer()
                 Button("Copy JSON") { store.copyToClipboard(store.inspection?.json ?? "") }
@@ -199,7 +231,7 @@ struct ContainerDetailView: View {
             }
             .padding(.horizontal, 26).padding(.vertical, 15)
             ScrollView([.horizontal, .vertical]) {
-                Text(store.inspection?.json ?? "Loading inspection…")
+                Text(store.inspection?.json ?? "")
                     .font(DockeyFonts.mono(11)).lineSpacing(4).textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .topLeading).padding(.horizontal, 26).padding(.bottom, 22)
             }
@@ -243,7 +275,8 @@ struct ContainerDetailView: View {
     }
 
     private var mountsContent: some View {
-        Group {
+        VStack(spacing: 0) {
+            inspectionStatus
             if let mounts = store.inspection?.mounts, !mounts.isEmpty {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
@@ -260,6 +293,8 @@ struct ContainerDetailView: View {
                             .font(DockeyFonts.ui(11)).foregroundStyle(palette.muted).padding(.top, 20)
                     }.padding(.horizontal, 26)
                 }
+            } else if store.inspection == nil {
+                Spacer(minLength: 0)
             } else {
                 DockeyEmptyState(
                     title: "No mounts", message: "This container has no bind mounts or named volumes.",

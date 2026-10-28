@@ -42,9 +42,9 @@ Choose a destination or an already-built app:
 
 The destination is a directory; the final app is always named `Dockey.app`. The scripts refuse to overwrite a symlink, a non-Dockey bundle, or an app running from that exact target path. Quit the installed copy before updating it.
 
-The default native launch check requires a macOS graphical session and Python 3, available with the development tools used for source builds. It re-signs temporary app copies in both flat SwiftPM and wrapped SwiftBuild resource layouts. Each layout must reject a missing font, verify intact resources, and export a readable demo PNG. Only temporary copies are modified and removed. To check a downloaded/extracted bundle, use `./scripts/check-app-launch.sh --app /path/to/Dockey.app`. The default per-launch limit is 30 seconds; `--timeout SECONDS` can adjust it.
+The default native launch check requires a macOS graphical session and Python 3, available with the development tools used for source builds. It re-signs temporary app copies in both flat SwiftPM and wrapped SwiftBuild resource layouts. Each layout must reject a missing font or service mark, verify intact resources, and export a readable demo PNG. Only temporary copies are modified and removed. To check a downloaded/extracted bundle, use `./scripts/check-app-launch.sh --app /path/to/Dockey.app`. The default per-launch limit is 30 seconds; `--timeout SECONDS` can adjust it.
 
-An explicit `./scripts/check-app-launch.sh --resources-only` runs both layouts' startup, font/license, and missing-font checks without opening a window or exporting PNGs. It provides **no GUI rendering coverage** and does not suppress unexpected verification failures. CI uses this mode only for its Intel hosted runner, whose Metal device fails during rendering; Apple Silicon CI retains the full PNG gate. Physical Intel visual compatibility has not been verified. The default check never falls back to resources-only mode.
+An explicit `./scripts/check-app-launch.sh --resources-only` runs both layouts' startup, font/mark/license, and missing-resource checks without opening a window or exporting PNGs. It provides **no GUI rendering coverage** and does not suppress unexpected verification failures. CI uses this mode only for its Intel hosted runner, whose Metal device fails during rendering; Apple Silicon CI retains the full PNG gate. Physical Intel visual compatibility has not been verified. The default check never falls back to resources-only mode.
 
 ## Release ZIPs and Gatekeeper
 
@@ -53,7 +53,7 @@ An explicit `./scripts/check-app-launch.sh --resources-only` runs both layouts' 
 Download both the ZIP and its matching `.sha256` file into the same folder and verify before extracting:
 
 ```sh
-shasum -a 256 -c Dockey-0.1.1-macos-arm64.zip.sha256
+shasum -a 256 -c Dockey-0.1.2-macos-arm64.zip.sha256
 ```
 
 Extract the archive and move `Dockey.app` to `~/Applications` or your normal Applications folder. The script can also install the extracted app using `--app`.
@@ -70,9 +70,16 @@ Quitting or uninstalling Dockey leaves the engine and existing containers runnin
 
 ## Update
 
-1. Quit Dockey.
-2. Review the new source or release notes.
-3. Install the new build using the same command or replace the app in Finder.
+Quit Dockey before replacing it.
+
+For a source installation, open your checkout and check `git status --short`. Preserve any local changes before updating; the installer does not fetch source or reset your checkout. On the branch you intend to follow, fetch its latest changes, review them and the release notes, then rebuild:
+
+```sh
+git pull --ff-only
+./scripts/install.sh --open
+```
+
+For a packaged installation, download the new ZIP and matching checksum from Releases, verify the checksum, extract it, and replace the installed app in Finder.
 
 Preferences are retained. The initial release has no automatic updater; nothing downloads or replaces the app in the background.
 
@@ -110,7 +117,7 @@ Optional preference removal:
 ## Produce a distributable archive
 
 ```sh
-./scripts/build-app.sh --version 0.1.1
+./scripts/build-app.sh --version 0.1.2
 ./scripts/check-app-launch.sh
 ./scripts/package-release.sh
 ```

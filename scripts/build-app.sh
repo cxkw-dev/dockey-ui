@@ -7,7 +7,7 @@ usage() {
 Usage: ./scripts/build-app.sh [options]
   --configuration release|debug  Build configuration (default: release)
   --arch arm64|x86_64             Build one architecture (default: current Mac)
-  --version VERSION              Bundle version (default: 0.1.1)
+  --version VERSION              Bundle version (default: 0.1.2)
   --output-dir DIRECTORY         Bundle destination (default: ./dist)
   --skip-build                   Package an already-built executable
   --sign IDENTITY                codesign identity (default: ad-hoc "-")

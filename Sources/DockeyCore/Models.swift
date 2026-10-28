@@ -158,14 +158,20 @@ public struct OperationReport: Sendable, Equatable {
 }
 
 public struct ImageSummary: Identifiable, Sendable, Equatable {
+    /// Distinguishes repository/tag rows that can refer to the same engine image.
     public let id: String
+    /// The Docker Engine image identifier, suitable for copying into Docker commands.
+    public let imageID: String
     public let repository: String
     public let tag: String
     public let size: String
     public let createdSince: String
     public var displayName: String { tag == "<none>" ? repository : "\(repository):\(tag)" }
-    public init(id: String, repository: String, tag: String, size: String, createdSince: String = "") {
+    public init(
+        id: String, repository: String, tag: String, size: String, createdSince: String = "", imageID: String? = nil
+    ) {
         self.id = id
+        self.imageID = imageID ?? id
         self.repository = repository
         self.tag = tag
         self.size = size

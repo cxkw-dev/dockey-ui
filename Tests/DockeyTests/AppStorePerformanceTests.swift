@@ -217,6 +217,59 @@ struct AppStorePerformanceTests {
     }
 
     @Test
+    func eventReaderDrainsIgnoredBurstsWhileInitialInventoryIsHeld() async throws {
+        let fixture = try makeStore()
+        await fixture.runner.holdInventoryReads()
+        let startup = Task { await fixture.store.start() }
+        defer {
+            startup.cancel()
+            fixture.store.shutdown()
+            fixture.cleanDefaults()
+            Task { await fixture.runner.releaseInventoryReads() }
+        }
+        try await waitUntil {
+            let counts = await fixture.runner.counts()
+            return counts.eventStreams == 1 && counts.inventory == 1
+        }
+        // Pace the producer to let the decoder run. The inventory gate remains closed
+        // for the complete burst, exceeding the typed stream's 256-record capacity.
+        for _ in 0..<320 {
+            await fixture.runner.emitEvent(type: "container", action: "exec_start")
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        #expect(await fixture.runner.counts().activeEvents == 1, "A held snapshot must not block the event reader.")
+        await fixture.runner.releaseInventoryReads()
+        await startup.value
+        try await settleInitialSubscription(fixture)
+        #expect(fixture.store.liveUpdateError == nil)
+        #expect(await fixture.runner.counts().eventStreams == 1)
+        #expect(await fixture.runner.counts().inventory == 2, "Ignored exec events must not queue extra snapshots.")
+    }
+
+    @Test
+    func eventReconnectInvalidatesFreshResourceCacheAndUpdatesVisibleRows() async throws {
+        let fixture = try makeStore()
+        defer {
+            fixture.store.shutdown()
+            fixture.cleanDefaults()
+        }
+        await fixture.store.start()
+        try await settleInitialSubscription(fixture)
+        fixture.store.selectSection(.images)
+        try await waitUntil { fixture.store.images.first?.repository == "fixture" && !fixture.store.isLoadingResources }
+        let before = await fixture.runner.counts()
+        await fixture.runner.disconnectEvents()
+        await fixture.runner.setImageRepository("fixture-after-gap")
+        try await waitUntil { await fixture.runner.counts().eventStreams == before.eventStreams + 1 }
+        try await waitUntil {
+            fixture.store.images.first?.repository == "fixture-after-gap" && !fixture.store.isLoadingResources
+        }
+        #expect(await fixture.runner.counts().images == before.images + 1)
+        #expect(await fixture.runner.counts().inventory == before.inventory + 1)
+        #expect(!fixture.store.isRefreshing)
+    }
+
+    @Test
     func bootstrapReplayStartsBeforeSlowInitialDiscoveryAndInventory() async throws {
         let fixture = try makeStore()
         defer {
@@ -303,6 +356,7 @@ private actor EventFixtureRunner: CommandRunning {
         var eventStreams = 0
         var statsStreams = 0
         var activeStats = 0
+        var activeEvents = 0
         var firstReplaySince: Int?
         var firstInventoryAt: Date?
     }
@@ -318,12 +372,43 @@ private actor EventFixtureRunner: CommandRunning {
     private var discoveryDelay = Duration.zero
     private var localContextsExist = true
     private var containerState = "running"
+    private var imageRepository = "fixture"
+    private var inventoryHeld = false
+    private var inventoryWaiters: [UUID: CheckedContinuation<Void, Error>] = [:]
 
     func counts() -> Counts { value }
     func setInventoryDelay(_ delay: Duration) { inventoryDelay = delay }
     func setDiscoveryDelay(_ delay: Duration) { discoveryDelay = delay }
     func removeLocalContexts() { localContextsExist = false }
     func setContainerState(_ state: String) { containerState = state }
+    func setImageRepository(_ repository: String) { imageRepository = repository }
+    func holdInventoryReads() { inventoryHeld = true }
+    func releaseInventoryReads() {
+        inventoryHeld = false
+        let waiting = Array(inventoryWaiters.values)
+        inventoryWaiters.removeAll()
+        for continuation in waiting { continuation.resume() }
+    }
+    private func cancelInventoryRead(_ token: UUID) {
+        inventoryWaiters.removeValue(forKey: token)?.resume(throwing: CancellationError())
+    }
+    private func waitForInventoryRelease() async throws {
+        guard inventoryHeld else { return }
+        let token = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                if Task.isCancelled {
+                    continuation.resume(throwing: CancellationError())
+                } else if inventoryHeld {
+                    inventoryWaiters[token] = continuation
+                } else {
+                    continuation.resume()
+                }
+            }
+        } onCancel: {
+            Task { await self.cancelInventoryRead(token) }
+        }
+    }
     func hasStreams(context: String) -> Bool {
         streams.values.contains { $0.context == context && $0.kind == "stats" }
             && streams.values.contains { $0.context == context && $0.kind == "events" }
@@ -377,6 +462,7 @@ private actor EventFixtureRunner: CommandRunning {
         if args.contains("container"), args.contains("ls") {
             value.inventory += 1
             if value.firstInventoryAt == nil { value.firstInventoryAt = Date() }
+            try await waitForInventoryRelease()
             try await Task.sleep(for: inventoryDelay)
             return CommandOutput(stdout: id + "\n")
         }
@@ -391,7 +477,7 @@ private actor EventFixtureRunner: CommandRunning {
             value.images += 1
             return CommandOutput(
                 stdout:
-                    "{\"ID\":\"sha256:fixture\",\"Repository\":\"fixture\",\"Tag\":\"latest\",\"Size\":\"1MB\",\"CreatedSince\":\"today\"}"
+                    "{\"ID\":\"sha256:fixture\",\"Repository\":\"\(imageRepository)\",\"Tag\":\"latest\",\"Size\":\"1MB\",\"CreatedSince\":\"today\"}"
             )
         }
         if args.contains("volume"), args.contains("ls") { value.volumes += 1 }
@@ -418,6 +504,7 @@ private actor EventFixtureRunner: CommandRunning {
         streams[token] = Stream(kind: kind, context: context, continuation: continuation)
         if kind == "events" {
             value.eventStreams += 1
+            value.activeEvents += 1
             if value.firstReplaySince == nil, let index = args.firstIndex(of: "--since"),
                 args.indices.contains(index + 1)
             {
@@ -430,6 +517,10 @@ private actor EventFixtureRunner: CommandRunning {
     }
     private func removeStream(_ token: UUID) {
         terminated.insert(token)
-        if streams.removeValue(forKey: token)?.kind == "stats" { value.activeStats -= 1 }
+        switch streams.removeValue(forKey: token)?.kind {
+        case "stats": value.activeStats -= 1
+        case "events": value.activeEvents -= 1
+        default: break
+        }
     }
 }

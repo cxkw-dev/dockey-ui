@@ -40,11 +40,18 @@ struct DockeyApp: App {
             do {
                 try DockeyFonts.verifyBundledFonts()
                 print("Dockey bundled fonts verified.")
-                if options.screenshotPath == nil, options.iconPath == nil { exit(EXIT_SUCCESS) }
             } catch {
                 fputs("Dockey bundled font verification failed.\n", stderr)
                 exit(EXIT_FAILURE)
             }
+            do {
+                try ServiceIconResources.verifyBundledAssets()
+                print("Dockey bundled service icons verified.")
+            } catch {
+                fputs("Dockey bundled service icon verification failed.\n", stderr)
+                exit(EXIT_FAILURE)
+            }
+            if options.screenshotPath == nil, options.iconPath == nil { exit(EXIT_SUCCESS) }
         }
         if let path = options.iconPath {
             do {
@@ -113,6 +120,8 @@ final class DockeyAppDelegate: NSObject, NSApplicationDelegate {
                 guard let window = NSApp.windows.first(where: { $0.title == "Dockey" && $0.isVisible }) else {
                     throw CocoaError(.fileWriteUnknown)
                 }
+                // Documentation exports use a consistent canvas, independent of saved live-window size.
+                window.setContentSize(NSSize(width: 1280, height: 960))
                 try AppScreenshot.capture(window: window, destination: URL(fileURLWithPath: path))
                 NSApp.terminate(nil)
             } catch {

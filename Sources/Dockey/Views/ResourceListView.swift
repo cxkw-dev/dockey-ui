@@ -12,6 +12,18 @@ struct ResourceListView: View {
     private var palette: DockeyPalette { DockeyPalette(scheme: scheme) }
 
     var body: some View {
+        VStack(spacing: 0) {
+            if let error = store.resourceError, !rows.isEmpty {
+                DockeyFailureView(title: "\(title) may be out of date", message: error, isRetrying: store.isLoadingResources) {
+                    Task { await store.retryResources() }
+                }
+            }
+            resourceContent
+        }
+    }
+
+    @ViewBuilder
+    private var resourceContent: some View {
         if rows.isEmpty && (store.isLoadingResources || store.isRefreshing) {
             VStack(spacing: 12) {
                 ProgressView().controlSize(.small)
@@ -20,6 +32,11 @@ struct ResourceListView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityElement(children: .combine)
+        } else if rows.isEmpty, let error = store.resourceError {
+            DockeyEmptyState(title: "Could not load \(title.lowercased())", message: error,
+                symbol: "exclamationmark.circle", actionTitle: "Retry") {
+                Task { await store.retryResources() }
+            }
         } else if rows.isEmpty {
             DockeyEmptyState(
                 title: "No \(title.lowercased()) found",
@@ -43,7 +60,7 @@ struct ResourceListView: View {
                             Spacer(minLength: 20)
                             Text(row.metadata).font(DockeyFonts.mono(10)).foregroundStyle(palette.muted)
                             Button {
-                                store.copyToClipboard(row.id)
+                                store.copyToClipboard(row.copyID)
                             } label: {
                                 Image(systemName: "doc.on.doc").font(.system(size: 12)).frame(width: 25, height: 28)
                             }
@@ -74,7 +91,7 @@ struct ResourceListView: View {
             store.images.map {
                 ResourceRow(
                     id: $0.id, name: $0.displayName, detail: String($0.id.prefix(19)),
-                    metadata: "\($0.size) · \($0.createdSince)", imageReference: $0.displayName)
+                    metadata: "\($0.size) · \($0.createdSince)", imageReference: $0.displayName, copyID: $0.imageID)
             }
         case .volumes:
             store.volumes.map { ResourceRow(id: $0.name, name: $0.name, detail: $0.mountpoint, metadata: $0.driver) }
@@ -108,12 +125,14 @@ private struct ResourceRow {
     let detail: String
     let metadata: String
     let imageReference: String?
+    let copyID: String
 
-    init(id: String, name: String, detail: String, metadata: String, imageReference: String? = nil) {
+    init(id: String, name: String, detail: String, metadata: String, imageReference: String? = nil, copyID: String? = nil) {
         self.id = id
         self.name = name
         self.detail = detail
         self.metadata = metadata
         self.imageReference = imageReference
+        self.copyID = copyID ?? id
     }
 }
