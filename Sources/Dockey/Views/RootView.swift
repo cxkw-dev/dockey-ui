@@ -267,6 +267,8 @@ struct RootView: View {
             ResourceListView(kind: .volumes, store: store)
         case .networks:
             ResourceListView(kind: .networks, store: store)
+        case .storage:
+            StorageView(store: store)
         case .activity:
             activityList
         }
@@ -355,6 +357,7 @@ struct RootView: View {
         case .images: "Local images available in the selected engine"
         case .volumes: "Storage volumes · inspection only"
         case .networks: "Networks in the selected engine"
+        case .storage: "What could be cleaned up to free disk space · analysis only"
         case .activity: "Operations and connection events from this session"
         case .containers: ""
         }
@@ -366,7 +369,7 @@ struct RootView: View {
         case .images: store.images.count
         case .volumes: store.volumes.count
         case .networks: store.networks.count
-        case .activity: nil
+        case .storage, .activity: nil
         }
     }
 

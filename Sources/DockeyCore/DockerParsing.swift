@@ -113,6 +113,157 @@ enum DockerParsing {
         return stat
     }
 
+    /// Reads `docker system df --verbose` JSON into usage totals and cleanup candidates.
+    static func storage(_ text: String) throws -> StorageReport {
+        let root = try object(text.trimmingCharacters(in: .whitespacesAndNewlines), operation: "disk usage")
+        func rows(_ key: String) -> [[String: Any]] { root[key] as? [[String: Any]] ?? [] }
+        var usage: [StorageUsage] = []
+        var candidates: [CleanupCandidate] = []
+
+        // One image ID can appear once per repository tag; size and container counts belong to the image.
+        var images: [String: (tags: [String], containers: Int?, row: [String: Any])] = [:]
+        var imageOrder: [String] = []
+        for row in rows("Images") {
+            guard let id = row["ID"] as? String, !id.isEmpty else { continue }
+            let repository = row["Repository"] as? String ?? "<none>"
+            let tag = row["Tag"] as? String ?? "<none>"
+            if images[id] == nil {
+                imageOrder.append(id)
+                images[id] = ([], integer(row["Containers"]), row)
+            }
+            if repository != "<none>" {
+                images[id]?.tags.append(tag == "<none>" ? repository : "\(repository):\(tag)")
+            }
+        }
+        for id in imageOrder {
+            guard let image = images[id], let containers = image.containers, containers == 0 else { continue }
+            let dangling = image.tags.isEmpty
+            let shortID = String(id.replacingOccurrences(of: "sha256:", with: "").prefix(12))
+            candidates.append(
+                CleanupCandidate(
+                    kind: dangling ? .danglingImage : .unusedImage, identifier: id,
+                    name: dangling ? "<none> · \(shortID)" : image.tags.joined(separator: ", "),
+                    detail: joined(
+                        dangling ? nil : shortID, (image.row["CreatedSince"] as? String).map { "Created \($0)" }),
+                    bytes: size(image.row["UniqueSize"]) ?? size(image.row["Size"]),
+                    // Removing an image ID with several tags fails; untag each reference instead.
+                    removalArguments: ["image", "rm", "--"] + (dangling ? [id] : image.tags)))
+        }
+        usage.append(
+            StorageUsage(
+                category: .images, count: imageOrder.count,
+                activeCount: imageOrder.filter { (images[$0]?.containers ?? 0) > 0 }.count, bytes: nil))
+
+        let containers = rows("Containers")
+        var containerBytes: UInt64 = 0
+        var activeContainers = 0
+        for row in containers {
+            let bytes = size(row["Size"])
+            containerBytes &+= bytes ?? 0
+            let state = ContainerState(rawValue: row["State"] as? String ?? "") ?? .unknown
+            if [.running, .paused, .restarting].contains(state) { activeContainers += 1 }
+            guard [.exited, .created, .dead].contains(state), let id = row["ID"] as? String, !id.isEmpty else {
+                continue
+            }
+            candidates.append(
+                CleanupCandidate(
+                    kind: .stoppedContainer, identifier: id, name: row["Names"] as? String ?? String(id.prefix(12)),
+                    detail: joined(row["Image"] as? String, row["Status"] as? String),
+                    bytes: bytes, project: labels(row["Labels"])["com.docker.compose.project"],
+                    removalArguments: ["container", "rm", "--", id]))
+        }
+        usage.append(
+            StorageUsage(
+                category: .containers, count: containers.count, activeCount: activeContainers, bytes: containerBytes))
+
+        let volumes = rows("Volumes")
+        var volumeBytes: UInt64 = 0
+        var activeVolumes = 0
+        for row in volumes {
+            let bytes = size(row["Size"])
+            volumeBytes &+= bytes ?? 0
+            guard let name = row["Name"] as? String, !name.isEmpty, let links = integer(row["Links"]) else { continue }
+            if links > 0 {
+                activeVolumes += 1
+                continue
+            }
+            let tags = labels(row["Labels"])
+            let anonymous =
+                tags["com.docker.volume.anonymous"] != nil
+                || (name.count == 64 && name.allSatisfy { $0.isHexDigit && !$0.isUppercase })
+            candidates.append(
+                CleanupCandidate(
+                    kind: anonymous ? .anonymousVolume : .namedVolume, identifier: name,
+                    name: anonymous ? String(name.prefix(12)) : name,
+                    detail: joined(
+                        row["Driver"] as? String, tags["com.docker.compose.volume"].map { "Compose volume \($0)" }),
+                    bytes: bytes, project: tags["com.docker.compose.project"],
+                    removalArguments: ["volume", "rm", "--", name]))
+        }
+        usage.append(
+            StorageUsage(category: .volumes, count: volumes.count, activeCount: activeVolumes, bytes: volumeBytes))
+
+        let cache = rows("BuildCache")
+        var cacheBytes: UInt64 = 0
+        var activeCache = 0
+        for row in cache {
+            let bytes = size(row["Size"])
+            cacheBytes &+= bytes ?? 0
+            if boolean(row["InUse"]) {
+                activeCache += 1
+                continue
+            }
+            guard let id = row["ID"] as? String, !id.isEmpty else { continue }
+            let type = (row["CacheType"] ?? row["Type"]) as? String
+            let description = (row["Description"] as? String).flatMap { $0.isEmpty ? nil : String($0.prefix(120)) }
+            candidates.append(
+                CleanupCandidate(
+                    kind: .buildCache, identifier: id, name: description ?? type ?? String(id.prefix(12)),
+                    detail: joined(
+                        description == nil ? nil : type, (row["LastUsedSince"] as? String).map { "Last used \($0)" }),
+                    bytes: bytes))
+        }
+        usage.append(
+            StorageUsage(category: .buildCache, count: cache.count, activeCount: activeCache, bytes: cacheBytes))
+
+        candidates.sort { lhs, rhs in
+            lhs.bytes ?? 0 == rhs.bytes ?? 0
+                ? lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+                : lhs.bytes ?? 0 > rhs.bytes ?? 0
+        }
+        return StorageReport(usage: usage, candidates: candidates)
+    }
+
+    /// Docker renders labels in verbose disk usage as `key=value,key=value`.
+    private static func labels(_ value: Any?) -> [String: String] {
+        if let dictionary = value as? [String: String] { return dictionary }
+        guard let text = value as? String else { return [:] }
+        return text.split(separator: ",").reduce(into: [:]) { result, pair in
+            let parts = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard let key = parts.first, !key.isEmpty else { return }
+            result[String(key)] = parts.count > 1 ? String(parts[1]) : ""
+        }
+    }
+
+    private static func size(_ value: Any?) -> UInt64? {
+        if let number = value as? NSNumber { return number.int64Value >= 0 ? number.uint64Value : nil }
+        return (value as? String).flatMap(ByteSize.parse)
+    }
+
+    private static func integer(_ value: Any?) -> Int? {
+        let number = (value as? NSNumber)?.intValue ?? (value as? String).flatMap { Int($0) }
+        return number.flatMap { $0 >= 0 ? $0 : nil }
+    }
+
+    private static func boolean(_ value: Any?) -> Bool {
+        if let flag = value as? Bool { return flag }
+        return (value as? String)?.lowercased() == "true"
+    }
+
+    private static func joined(_ parts: String?...) -> String {
+        parts.compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · ")
+    }
+
     static func inspection(_ text: String) throws -> ContainerInspection {
         guard let raw = try array(text, operation: "container inspection").first else {
             throw DockerError.invalidResponse("container inspection")

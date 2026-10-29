@@ -36,6 +36,7 @@ Built with **SwiftUI and AppKit**. No Electron, browser server, account, or tele
 | Control existing containers | Start, stop, and restart one container or a group, with pending state and specific operation results. Start is muted green; Stop is muted red. |
 | Investigate a service | Follow bounded logs, inspect redacted configuration, and view ports, mounts, and current resource metrics. |
 | Inspect local resources | Browse images, volumes, and networks without deleting them. |
+| Find reclaimable space | The Storage view measures disk usage and lists dangling and unused images, stopped containers, unattached volumes, and idle build cache by size. It copies context-pinned `docker` commands for you to review and run; Dockey never removes anything itself. Named volumes have no bulk command. |
 | Recognize services | Official monochrome ClickHouse, Langfuse, Temporal, and standalone MongoDB marks; AI Focus's F; Redis cache lines; and a Lucide elephant for PostgreSQL. Icons share a consistent layout with adjusted visual sizes. [Sources and licenses](docs/service-icons.md). |
 | Choose a connection | Select a local Docker context within Dockey. The global Docker CLI context is unchanged. |
 | Stay current | Docker events drive container updates; live metrics stream while visible. No repeating inventory polling. |

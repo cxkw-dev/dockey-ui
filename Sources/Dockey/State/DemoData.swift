@@ -78,6 +78,57 @@ enum DemoData {
         NetworkSummary(id: "demo-bridge", name: "bridge", driver: "bridge"),
     ]
 
+    static let storage = StorageReport(
+        usage: [
+            StorageUsage(category: .images, count: 14, activeCount: 9, bytes: nil),
+            StorageUsage(category: .containers, count: 11, activeCount: 9, bytes: 96_400_000),
+            StorageUsage(category: .volumes, count: 7, activeCount: 3, bytes: 3_920_000_000),
+            StorageUsage(category: .buildCache, count: 42, activeCount: 0, bytes: 1_640_000_000),
+        ],
+        candidates: [
+            image("node:20-alpine", id: "demo-node-20", bytes: 162_000_000, created: "3 months ago"),
+            image("postgres:16-alpine", id: "demo-postgres-16", bytes: 271_000_000, created: "2 months ago"),
+            image("langfuse/langfuse:2", id: "demo-langfuse-2", bytes: 598_000_000, created: "5 weeks ago"),
+            image(nil, id: "3f2a9c1d0b7e", bytes: 412_000_000, created: "6 days ago"),
+            image(nil, id: "9b41e07ac2d5", bytes: 286_000_000, created: "2 weeks ago"),
+            CleanupCandidate(
+                kind: .stoppedContainer, identifier: "demo-storefront-worker", name: "storefront-worker-1",
+                detail: "storefront-worker:dev · Exited (0)", bytes: 48_200_000, project: "storefront",
+                removalArguments: ["container", "rm", "--", "demo-storefront-worker"]),
+            CleanupCandidate(
+                kind: .stoppedContainer, identifier: "demo-standalone-mailpit", name: "mailpit",
+                detail: "axllent/mailpit:latest · Exited (0)", bytes: 1_300_000,
+                removalArguments: ["container", "rm", "--", "demo-standalone-mailpit"]),
+            volume("a81c4f0e92d7", anonymous: true, bytes: 734_000_000),
+            volume("5e06bd31f7a8", anonymous: true, bytes: 88_000_000),
+            volume("storefront_postgres_data_old", anonymous: false, bytes: 1_210_000_000, project: "storefront"),
+            volume("scratch_uploads", anonymous: false, bytes: 12_400_000),
+            CleanupCandidate(
+                kind: .buildCache, identifier: "demo-cache-1", name: "[api 4/6] RUN npm ci",
+                detail: "regular · Last used 9 days ago", bytes: 912_000_000),
+            CleanupCandidate(
+                kind: .buildCache, identifier: "demo-cache-2", name: "[worker 3/5] RUN pip install -r requirements.txt",
+                detail: "regular · Last used 3 weeks ago", bytes: 507_000_000),
+            CleanupCandidate(
+                kind: .buildCache, identifier: "demo-cache-3", name: "local source for context",
+                detail: "source.local · Last used 9 days ago", bytes: 221_000_000),
+        ].sorted { ($0.bytes ?? 0) > ($1.bytes ?? 0) })
+
+    private static func image(_ reference: String?, id: String, bytes: UInt64, created: String) -> CleanupCandidate {
+        CleanupCandidate(
+            kind: reference == nil ? .danglingImage : .unusedImage, identifier: id,
+            name: reference ?? "<none> · \(id)", detail: "Created \(created)", bytes: bytes,
+            removalArguments: ["image", "rm", "--", reference ?? id])
+    }
+
+    private static func volume(_ name: String, anonymous: Bool, bytes: UInt64, project: String? = nil)
+        -> CleanupCandidate
+    {
+        CleanupCandidate(
+            kind: anonymous ? .anonymousVolume : .namedVolume, identifier: name, name: name, detail: "local",
+            bytes: bytes, project: project, removalArguments: ["volume", "rm", "--", name])
+    }
+
     static func inspection(for container: DockerContainer) -> ContainerInspection {
         let json = """
             {

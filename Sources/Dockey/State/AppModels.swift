@@ -1,7 +1,7 @@
 import Foundation
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case containers, images, volumes, networks, activity
+    case containers, images, volumes, networks, storage, activity
     var id: String { rawValue }
     var label: String { rawValue.capitalized }
     var symbol: String {
@@ -10,6 +10,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .images: "square.stack.3d.up"
         case .volumes: "externaldrive"
         case .networks: "network"
+        case .storage: "internaldrive"
         case .activity: "waveform.path.ecg"
         }
     }

@@ -204,6 +204,13 @@ public actor DockerClient {
         }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
+    /// Read-only disk usage analysis. Volume sizes are measured by the engine, so this can take a while.
+    public func diskUsage(context: String) async throws -> StorageReport {
+        try await requireLocal(context)
+        return try DockerParsing.storage(
+            await raw(["--context", context, "system", "df", "--verbose", "--format", "{{json .}}"], timeout: 90))
+    }
+
     public func engineInfo(context: String) async throws -> EngineInfo {
         try await requireLocal(context)
         let output = try await raw(["--context", context, "info", "--format", "{{json .}}"])

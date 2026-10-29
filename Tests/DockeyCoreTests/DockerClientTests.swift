@@ -93,6 +93,17 @@ struct DockerClientTests {
         #expect(images.map(\.displayName) == ["fixture:latest", "fixture:v1"])
     }
 
+    @Test func diskUsageIsAReadOnlyContextPinnedQuery() async throws {
+        let runner = StubRunner([local, CommandOutput(stdout: #"{"Images":[],"Containers":[],"Volumes":[]}"#)])
+        let report = try await client(runner).diskUsage(context: "fixture")
+        #expect(report.candidates.isEmpty)
+        #expect(report.usage.map(\.category) == [.images, .containers, .volumes, .buildCache])
+        let requests = await runner.requests
+        #expect(requests.count == 2)
+        #expect(requests[1].arguments == ["--context", "fixture", "system", "df", "--verbose", "--format", "{{json .}}"])
+        #expect(!requests.contains { $0.arguments.contains { ["prune", "rm"].contains($0) } })
+    }
+
     @Test func nonFollowingLogsIncludeContainerStderr() async throws {
         let runner = StubRunner([local, CommandOutput(stdout: "ready\n", stderr: "application error\n")])
         let logs = try await client(runner).logs(containerID: idA, context: "fixture", tail: 50_000)

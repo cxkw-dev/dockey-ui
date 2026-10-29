@@ -13,6 +13,7 @@ final class AppStore: ObservableObject {
     @Published var images: [ImageSummary] = []
     @Published var volumes: [VolumeSummary] = []
     @Published var networks: [NetworkSummary] = []
+    @Published var storage: StorageReport?
     @Published var engineInfo: EngineInfo?
     @Published var selectedContext = "" {
         didSet {
@@ -158,6 +159,7 @@ final class AppStore: ObservableObject {
             images = DemoData.images
             volumes = DemoData.volumes
             networks = DemoData.networks
+            storage = DemoData.storage
             loadedContext = selectedContext
             connected = true
             expandNewGroups(previous: [])
@@ -370,7 +372,7 @@ final class AppStore: ObservableObject {
                     self.eventsRequestID == requestID
                 else { return }
                 // Event gaps may include resource changes with no subsequent event to invalidate a fresh cache.
-                for section in [AppSection.images, .volumes, .networks] {
+                for section in [AppSection.images, .volumes, .networks, .storage] {
                     self.resourcesFetchedAt.removeValue(forKey: section.rawValue)
                     self.resourceInvalidationVersions[section.rawValue, default: 0] &+= 1
                 }
@@ -435,8 +437,9 @@ final class AppStore: ObservableObject {
             ]
             guard lifecycle.contains(action) || action.hasPrefix("health_status") else { return }
             inventoryInvalidated = true
-        case "image": resourcesInvalidated.insert(AppSection.images.rawValue)
-        case "volume": resourcesInvalidated.insert(AppSection.volumes.rawValue)
+            if !action.hasPrefix("health_status") { resourcesInvalidated.insert(AppSection.storage.rawValue) }
+        case "image": resourcesInvalidated.formUnion([AppSection.images.rawValue, AppSection.storage.rawValue])
+        case "volume": resourcesInvalidated.formUnion([AppSection.volumes.rawValue, AppSection.storage.rawValue])
         case "network":
             resourcesInvalidated.insert(AppSection.networks.rawValue)
             if ["connect", "disconnect"].contains(event.action.lowercased()) { inventoryInvalidated = true }
@@ -445,6 +448,7 @@ final class AppStore: ObservableObject {
             engineInfoFetchedAt = nil
             resourcesInvalidated.formUnion([
                 AppSection.images.rawValue, AppSection.volumes.rawValue, AppSection.networks.rawValue,
+                AppSection.storage.rawValue,
             ])
         default: return
         }
@@ -557,7 +561,7 @@ final class AppStore: ObservableObject {
         _ section: AppSection, client: DockerClient, context: String, generation: Int, force: Bool,
         reportErrors: Bool
     ) async {
-        guard [.images, .volumes, .networks].contains(section), scopeMatches(context, generation: generation) else {
+        guard [.images, .volumes, .networks, .storage].contains(section), scopeMatches(context, generation: generation) else {
             return
         }
         let key = section.rawValue
@@ -602,6 +606,13 @@ final class AppStore: ObservableObject {
                         self.networks != result
                     {
                         self.networks = result
+                    }
+                case .storage:
+                    let result = try await client.diskUsage(context: context)
+                    if self.scopeMatches(context, generation: generation), !Task.isCancelled,
+                        self.storage != result
+                    {
+                        self.storage = result
                     }
                 default: break
                 }
@@ -959,6 +970,7 @@ final class AppStore: ObservableObject {
         images = []
         volumes = []
         networks = []
+        storage = nil
         engineInfo = nil
         closeDetail()
     }

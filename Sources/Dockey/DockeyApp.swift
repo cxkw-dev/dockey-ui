@@ -6,6 +6,7 @@ struct LaunchOptions {
     let demo: Bool
     let appearance: String?
     let screenshotPath: String?
+    let section: AppSection?
     let iconPath: String?
     let verifyResources: Bool
     let iconDarkPreview: Bool
@@ -22,6 +23,7 @@ struct LaunchOptions {
         }
         appearance = value(after: "--appearance")
         screenshotPath = value(after: "--screenshot")
+        section = value(after: "--section").flatMap(AppSection.init(rawValue:))
         iconPath = value(after: "--render-icon")
     }
 }
@@ -151,6 +153,10 @@ final class DockeyAppDelegate: NSObject, NSApplicationDelegate {
         Task { @MainActor in
             do {
                 try await Task.sleep(for: .milliseconds(1500))
+                if let section = options.section, let store = self.store {
+                    store.selectSection(section)
+                    try await Task.sleep(for: .milliseconds(300))
+                }
                 guard let window = NSApp.windows.first(where: { $0.title == "Dockey" && $0.isVisible }) else {
                     throw CocoaError(.fileWriteUnknown)
                 }
