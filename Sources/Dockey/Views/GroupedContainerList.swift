@@ -54,7 +54,7 @@ struct GroupedContainerList: View {
                 }
             }
             .preference(
-                key: DockeyMetricsVisibilityKey.self,
+                key: MetricsVisibilityKey.self,
                 value: metricsVisible
                     && store.groups.contains { group in
                         isExpanded(group) && group.containers.contains(where: \.isRunning)

@@ -87,7 +87,7 @@ struct ContainerDetailView: View {
             metricStrip
             detailContent
         }
-        .preference(key: DockeyMetricsVisibilityKey.self, value: container.isRunning)
+        .preference(key: MetricsVisibilityKey.self, value: container.isRunning)
     }
 
     private var shouldStop: Bool { [.running, .paused, .restarting].contains(container.state) }
@@ -162,7 +162,7 @@ struct ContainerDetailView: View {
             }
             .padding(.horizontal, 26).padding(.vertical, 15)
             if let error = store.logError {
-                DockeyFailureView(title: "Log connection interrupted", message: error) { store.retryLogs() }
+                FailureView(title: "Log connection interrupted", message: error) { store.retryLogs() }
             }
             if store.logText.isEmpty && store.logStreamState == .connecting {
                 ProgressView("Connecting to container logs…").controlSize(.small)
@@ -207,7 +207,7 @@ struct ContainerDetailView: View {
     @ViewBuilder
     private var inspectionStatus: some View {
         if let error = store.inspectionError {
-            DockeyFailureView(title: store.inspection == nil ? "Inspection unavailable" : "Inspection may be out of date",
+            FailureView(title: store.inspection == nil ? "Inspection unavailable" : "Inspection may be out of date",
                 message: error, isRetrying: store.isLoadingInspection) {
                 Task { await store.retryInspection() }
             }

@@ -141,7 +141,7 @@ struct DockeyBrandLockup: View {
     }
 }
 
-/// Native vector mascot based on design-assets/dockey-mark.svg.
+/// Native vector mascot based on design/dockey-mark.svg.
 struct DockeyMascot: View {
     enum Treatment { case flat, dock }
     var treatment: Treatment = .flat

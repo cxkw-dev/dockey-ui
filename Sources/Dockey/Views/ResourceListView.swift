@@ -14,7 +14,7 @@ struct ResourceListView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let error = store.resourceError, !rows.isEmpty {
-                DockeyFailureView(title: "\(title) may be out of date", message: error, isRetrying: store.isLoadingResources) {
+                FailureView(title: "\(title) may be out of date", message: error, isRetrying: store.isLoadingResources) {
                     Task { await store.retryResources() }
                 }
             }

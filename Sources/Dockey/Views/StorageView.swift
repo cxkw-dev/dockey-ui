@@ -13,7 +13,7 @@ struct StorageView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let error = store.resourceError, store.storage != nil {
-                DockeyFailureView(
+                FailureView(
                     title: "Storage may be out of date", message: error, isRetrying: store.isLoadingResources
                 ) {
                     Task { await store.retryResources() }

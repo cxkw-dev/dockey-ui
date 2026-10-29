@@ -10,7 +10,8 @@
 ## Architecture
 
 - Keep Docker parsing, models, subprocess execution, and safety contracts in `DockeyCore`.
-- Keep state and lifecycle coordination in `Sources/Dockey/State`, with native views in `Views` and shared styling in `Design`.
+- Keep state and lifecycle coordination in `Sources/Dockey/State`, with the app entry point in `App`, native views in `Views`, and shared styling in `Design`. `Design` types keep the `Dockey` prefix as the design-system namespace; other app types do not.
+- Place docs by audience: `docs/user`, `docs/dev`, or `docs/design`. Design source artwork lives in `design/`; bundle only copies the app needs in `Sources/Dockey/Resources`.
 - Pass a selected, verified local context to every engine command. Do not switch global Docker contexts or expose arbitrary shell execution.
 - Use argument arrays, bounded output, timeouts, cancellation, and per-container operation results.
 - Preserve Compose ownership from labels; app grouping must not infer ownership from container names.

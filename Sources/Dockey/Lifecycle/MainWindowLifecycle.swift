@@ -21,7 +21,7 @@ extension NSWindow: DockeyMainWindow {
 @MainActor
 final class MainWindowLifecycle: NSObject {
     private(set) weak var window: (any DockeyMainWindow)?
-    private var proxy: DockeyWindowDelegateProxy?
+    private var proxy: WindowDelegateProxy?
     private weak var observedWindow: NSWindow?
     private(set) var isTerminating = false
     var visibilityChanged: ((Bool) -> Void)?
@@ -54,7 +54,7 @@ final class MainWindowLifecycle: NSObject {
 
     private func installProxy(on window: NSWindow) {
         if let proxy, window.delegate === proxy { return }
-        let replacement = DockeyWindowDelegateProxy(original: window.delegate) { [weak self] _ in self?.hide() }
+        let replacement = WindowDelegateProxy(original: window.delegate) { [weak self] _ in self?.hide() }
         proxy = replacement
         window.delegate = replacement
     }
@@ -104,7 +104,7 @@ final class MainWindowLifecycle: NSObject {
 
 /// Only intercept user close. Objective-C optional delegate methods continue to SwiftUI.
 /// AppKit invokes window delegate callbacks on the main thread; no delegate or window is retained here.
-final class DockeyWindowDelegateProxy: NSObject, NSWindowDelegate {
+final class WindowDelegateProxy: NSObject, NSWindowDelegate {
     private(set) weak var originalDelegate: (any NSWindowDelegate)?
     private let hide: @MainActor (NSWindow) -> Void
 
@@ -131,7 +131,7 @@ final class DockeyWindowDelegateProxy: NSObject, NSWindowDelegate {
     }
 }
 
-struct DockeyWindowBridge: NSViewRepresentable {
+struct WindowBridge: NSViewRepresentable {
     let lifecycle: MainWindowLifecycle
 
     func makeNSView(context: Context) -> WindowCaptureView {

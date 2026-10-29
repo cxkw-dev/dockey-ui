@@ -11,7 +11,7 @@ let package = Package(
     targets: [
         .target(name: "DockeyCore"),
         .executableTarget(name: "Dockey", dependencies: ["DockeyCore"], resources: [.copy("Resources")]),
-        .executableTarget(name: "DockeySmoke", dependencies: ["DockeyCore"], path: "Tools/DockeySmoke"),
+        .executableTarget(name: "DockeySmoke", dependencies: ["DockeyCore"]),
         .testTarget(name: "DockeyCoreTests", dependencies: ["DockeyCore"]),
         .testTarget(name: "DockeyTests", dependencies: ["Dockey"]),
     ]

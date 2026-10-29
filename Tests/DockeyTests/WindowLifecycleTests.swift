@@ -60,7 +60,7 @@ struct WindowLifecycleTests {
         #expect(!lifecycle.show())
 
         var original: LifecycleDelegateFixture? = LifecycleDelegateFixture()
-        let proxy = DockeyWindowDelegateProxy(original: original, hide: { _ in })
+        let proxy = WindowDelegateProxy(original: original, hide: { _ in })
         weak var weakDelegate = original
         original = nil
         #expect(weakDelegate == nil)
@@ -70,7 +70,7 @@ struct WindowLifecycleTests {
     @Test
     func optionalWindowDelegateCallbacksContinueToTheOriginalDelegate() {
         let original = LifecycleDelegateFixture()
-        let proxy = DockeyWindowDelegateProxy(original: original, hide: { _ in })
+        let proxy = WindowDelegateProxy(original: original, hide: { _ in })
         let delegate: any NSWindowDelegate = proxy
         let selector = #selector(NSWindowDelegate.windowDidResize(_:))
         #expect(proxy.responds(to: selector))

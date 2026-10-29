@@ -47,7 +47,7 @@ struct RootView: View {
         .frame(minWidth: 900, minHeight: 580)
         .toolbar { toolbar }
         .task { await store.start() }
-        .onPreferenceChange(DockeyMetricsVisibilityKey.self) { visible in
+        .onPreferenceChange(MetricsVisibilityKey.self) { visible in
             Task { @MainActor in store.setMetricsVisible(visible) }
         }
         .onDisappear { store.setMainWindowVisible(false) }

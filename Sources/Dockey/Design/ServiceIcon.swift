@@ -3,7 +3,7 @@ import DockeyCore
 import SwiftUI
 
 /// Reviewed vendor marks and the ISC-licensed elephant use cached native vector PDFs.
-/// Source artwork and provenance live in design-assets/services/.
+/// Source artwork and provenance live in design/services/.
 @MainActor
 struct ServiceIcon: View {
     let identity: ServiceIdentity
