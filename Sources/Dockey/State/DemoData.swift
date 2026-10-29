@@ -8,16 +8,16 @@ enum DemoData {
         serverVersion: "29.0 · demo", architecture: "aarch64", operatingSystem: "Demo Linux VM", cpus: 6,
         memoryBytes: 8 * 1024 * 1024 * 1024)
     static let containers: [DockerContainer] = [
-        container("web", project: "storefront", image: "node:22-alpine", port: 3000),
+        container("web", project: "storefront", image: "node:26-alpine", port: 3000),
         container("api", project: "storefront", image: "storefront-api:dev", port: 8080),
-        container("postgres", project: "storefront", image: "postgres:17-alpine", port: 5432),
+        container("postgres", project: "storefront", image: "postgres:18-alpine", port: 5432),
         container("worker", project: "storefront", image: "storefront-worker:dev", state: .exited),
-        container("langfuse", project: "analytics", image: "langfuse/langfuse:3", health: .unhealthy, port: 3001),
-        container("clickhouse", project: "analytics", image: "clickhouse:25-alpine", port: 8123),
-        container("temporal", project: "analytics", image: "temporalio/server:1.29", port: 7233),
+        container("langfuse", project: "analytics", image: "langfuse/langfuse:4", health: .unhealthy, port: 3001),
+        container("clickhouse", project: "analytics", image: "clickhouse:26", port: 8123),
+        container("temporal", project: "analytics", image: "temporalio/server:1.32", port: 7233),
         container("redis-local", image: "redis:8-alpine", port: 6379),
         container("ai-focus", image: "ai-focus:latest", port: 4444),
-        container("documents-local", image: "mongo:8", port: 27017),
+        container("documents-local", image: "mongo:9", port: 27017),
         container("mailpit", image: "axllent/mailpit:latest", state: .exited, port: 8025),
     ]
 
@@ -47,22 +47,22 @@ enum DemoData {
     }
 
     static let images = [
-        ImageSummary(id: "demo-node", repository: "node", tag: "22-alpine", size: "168 MB", createdSince: "2 days ago"),
+        ImageSummary(id: "demo-node", repository: "node", tag: "26-alpine", size: "168 MB", createdSince: "2 days ago"),
         ImageSummary(
             id: "demo-api", repository: "storefront-api", tag: "dev", size: "284 MB", createdSince: "3 hours ago"),
         ImageSummary(
-            id: "demo-postgres", repository: "postgres", tag: "17-alpine", size: "277 MB", createdSince: "4 days ago"),
+            id: "demo-postgres", repository: "postgres", tag: "18-alpine", size: "277 MB", createdSince: "4 days ago"),
         ImageSummary(id: "demo-redis", repository: "redis", tag: "8-alpine", size: "42 MB", createdSince: "1 week ago"),
-        ImageSummary(id: "demo-mongo", repository: "mongo", tag: "8", size: "312 MB", createdSince: "3 days ago"),
+        ImageSummary(id: "demo-mongo", repository: "mongo", tag: "9", size: "312 MB", createdSince: "3 days ago"),
         ImageSummary(id: "demo-ai-focus", repository: "ai-focus", tag: "latest", size: "186 MB", createdSince: "1 day ago"),
         ImageSummary(
-            id: "demo-clickhouse", repository: "clickhouse", tag: "25-alpine", size: "284 MB",
+            id: "demo-clickhouse", repository: "clickhouse", tag: "26", size: "284 MB",
             createdSince: "2 days ago"),
         ImageSummary(
-            id: "demo-langfuse", repository: "langfuse/langfuse", tag: "3", size: "612 MB",
+            id: "demo-langfuse", repository: "langfuse/langfuse", tag: "4", size: "612 MB",
             createdSince: "1 day ago"),
         ImageSummary(
-            id: "demo-temporal", repository: "temporalio/server", tag: "1.29", size: "206 MB",
+            id: "demo-temporal", repository: "temporalio/server", tag: "1.32", size: "206 MB",
             createdSince: "3 days ago"),
     ]
     static let volumes = [
@@ -86,9 +86,9 @@ enum DemoData {
             StorageUsage(category: .buildCache, count: 42, activeCount: 0, bytes: 1_640_000_000),
         ],
         candidates: [
-            image("node:20-alpine", id: "demo-node-20", bytes: 162_000_000, created: "3 months ago"),
-            image("postgres:16-alpine", id: "demo-postgres-16", bytes: 271_000_000, created: "2 months ago"),
-            image("langfuse/langfuse:2", id: "demo-langfuse-2", bytes: 598_000_000, created: "5 weeks ago"),
+            image("node:24-alpine", id: "demo-node-24", bytes: 162_000_000, created: "3 months ago"),
+            image("postgres:17-alpine", id: "demo-postgres-17", bytes: 271_000_000, created: "2 months ago"),
+            image("langfuse/langfuse:3", id: "demo-langfuse-3", bytes: 598_000_000, created: "5 weeks ago"),
             image(nil, id: "3f2a9c1d0b7e", bytes: 412_000_000, created: "6 days ago"),  // pragma: allowlist secret
             image(nil, id: "9b41e07ac2d5", bytes: 286_000_000, created: "2 weeks ago"),  // pragma: allowlist secret
             CleanupCandidate(
