@@ -89,8 +89,8 @@ enum DemoData {
             image("node:20-alpine", id: "demo-node-20", bytes: 162_000_000, created: "3 months ago"),
             image("postgres:16-alpine", id: "demo-postgres-16", bytes: 271_000_000, created: "2 months ago"),
             image("langfuse/langfuse:2", id: "demo-langfuse-2", bytes: 598_000_000, created: "5 weeks ago"),
-            image(nil, id: "3f2a9c1d0b7e", bytes: 412_000_000, created: "6 days ago"),
-            image(nil, id: "9b41e07ac2d5", bytes: 286_000_000, created: "2 weeks ago"),
+            image(nil, id: "3f2a9c1d0b7e", bytes: 412_000_000, created: "6 days ago"),  // pragma: allowlist secret
+            image(nil, id: "9b41e07ac2d5", bytes: 286_000_000, created: "2 weeks ago"),  // pragma: allowlist secret
             CleanupCandidate(
                 kind: .stoppedContainer, identifier: "demo-storefront-worker", name: "storefront-worker-1",
                 detail: "storefront-worker:dev · Exited (0)", bytes: 48_200_000, project: "storefront",
@@ -99,8 +99,8 @@ enum DemoData {
                 kind: .stoppedContainer, identifier: "demo-standalone-mailpit", name: "mailpit",
                 detail: "axllent/mailpit:latest · Exited (0)", bytes: 1_300_000,
                 removalArguments: ["container", "rm", "--", "demo-standalone-mailpit"]),
-            volume("a81c4f0e92d7", anonymous: true, bytes: 734_000_000),
-            volume("5e06bd31f7a8", anonymous: true, bytes: 88_000_000),
+            volume("a81c4f0e92d7", anonymous: true, bytes: 734_000_000),  // pragma: allowlist secret
+            volume("5e06bd31f7a8", anonymous: true, bytes: 88_000_000),  // pragma: allowlist secret
             volume("storefront_postgres_data_old", anonymous: false, bytes: 1_210_000_000, project: "storefront"),
             volume("scratch_uploads", anonymous: false, bytes: 12_400_000),
             CleanupCandidate(
